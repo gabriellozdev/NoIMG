@@ -77,56 +77,15 @@ All image processing is performed locally.
 
 ## Development
 
-### Frontend Stack
+### Frontend
 
-- React
-- Vite
-- Tailwind CSS v4
-- Ice Blue Design System
+Fica em `frontend/` e usa React, Vite e Tailwind v4. O design foi feito com a skill oil-ui, com conceitos e revisões de agentes independentes; as notas estão em `.oil-ui/redesign/` (fora do git).
 
-The frontend is located in `frontend/`, with the main design system defined in `src/index.css`.
-
-The project also includes adapted [VengeanceUI](https://github.com/Ashutoshx7/VengeanceUI) components (MIT License) in `src/components/ui/`:
-
-- Spotlight Navbar
-- Border Beam
-- Stagger Text
-- Stats Counter
-- FAQ Accordion
-
-### Development Server
-
-Run the Vite development server from the `frontend/` directory:
-
-```bash
-npm run dev
-```
-
-Keep `app.py` running simultaneously. Vite proxies `/api` requests to the backend running on port `7860`.
-
-### Production Build
-
-```bash
-npm run build
-```
-
-The generated frontend is placed in `web/dist/` and served directly by `app.py`.
-
-### Demo Generation
-
-To regenerate the before-and-after demonstration images:
-
-```bash
-python gerar_demos.py
-```
-
-All demonstrations are generated using NoIMG's own image processing pipeline.
-
-### Image Credits
-
-Photos used in the interface come from Unsplash (via Lorem Picsum). Image credits are stored in `frontend/public/img/creditos.json` and displayed in the website footer.
-
----
+- **Direção "Vitrine da Coleção":** personagens recortados ficam sobre blocos de cor chapada, e o título passa atrás deles.
+- **Fontes:** Familjen Grotesk nos títulos e Instrument Sans no texto.
+- **Cores:** branco, tinta #141418, cobalto #2E4BFF (só nas ações), rosa #FFB3C7 e amarelo #FFE27A (nos blocos).
+- **Animações:** usam GSAP e respeitam a opção "reduzir movimento" do sistema.
+- **Imagens:** ficam em `frontend/public/site/`. São fotos do Unsplash de fundo liso, recortadas, ampliadas e padronizadas pelo próprio NoIMG. Os créditos estão no rodapé.
 
 ## Reverse Engineering & Technical Implementation
 
@@ -209,6 +168,21 @@ NoIMG is designed around local processing.
 - No image uploads to external processing servers.
 - AI models are downloaded during installation, not during image processing.
 - Your processed images remain under your control.
+
+## Open Source & Contributions
+
+NoIMG is an **open-source project**, and its source code is publicly available for everyone to explore, use, and improve.
+
+Contributions are welcome! If you have ideas, find bugs, or want to improve existing features, feel free to contribute.
+
+- **Fork** the repository.
+- Create a branch for your changes.
+- Submit a **Pull Request** with your improvements.
+- Report bugs and suggest new features through GitHub Issues.
+
+All contributions are appreciated. Whether it's fixing bugs, improving performance, refining the interface, or adding new features, your contributions help make NoIMG better.
+
+**The code is open, and everyone is welcome to contribute.**
 
 ---
 

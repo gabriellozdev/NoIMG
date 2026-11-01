@@ -1,412 +1,330 @@
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ShieldCheck, Cpu, FileImage } from "lucide-react";
-import { SpotlightNavbar } from "@/components/ui/spotlight-navbar";
-import TextAnimation from "@/components/ui/stagger-text";
-import StatsCounter from "@/components/ui/stats-counter";
-import { FaqAccordion } from "@/components/ui/faq-accordion";
+import { useCallback, useRef, useState } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
+import { Plus } from "lucide-react";
 import { CompareSlider } from "@/components/CompareSlider";
-import { Workspace, TOOLS } from "@/components/Workspace";
-import { fileFromUrl, type Mode } from "@/lib/api";
+import { Workspace } from "@/components/Workspace";
+import type { Mode } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const NAV = [
-  { label: "Ferramenta", href: "#topo" },
-  { label: "Remover fundo", href: "#removedor" },
-  { label: "Melhorar qualidade", href: "#melhorador" },
-  { label: "Exemplos", href: "#exemplos" },
-  { label: "Dúvidas", href: "#duvidas" },
+gsap.registerPlugin(ScrollTrigger, useGSAP);
+
+const NAV: [string, string][] = [
+  ["Remover fundo", "#remover"],
+  ["Melhorar", "#melhorar"],
+  ["Padronizar", "#padronizar"],
 ];
 
-/* recortes reais, feitos pelo próprio NoIMG, espalhados em volta do título */
-const COLLAGE = [
-  { src: "/demo/web/cachorro-sem-fundo.png", alt: "Filhote recortado", cls: "left-[2%] top-[16%] w-52 -rotate-6", tile: "checker" },
-  { src: "/demo/web/caneca-sem-fundo.png", alt: "Caneca recortada", cls: "left-[6%] top-[58%] w-44 rotate-3", tile: "bg-primary-light" },
-  { src: "/demo/web/pelicano-sem-fundo.png", alt: "Pelicano recortado", cls: "right-[3%] top-[12%] w-48 rotate-6", tile: "bg-surface" },
-  { src: "/demo/web/camera-sem-fundo.png", alt: "Câmera recortada", cls: "right-[5%] top-[52%] w-56 -rotate-3", tile: "checker" },
+/* a vitrine: personagens reais recortados pelo NoIMG, cada um sobre um bloco de cor */
+const VITRINE = [
+  { id: "coelho", alt: "Coelho branco de vinil", block: "bg-pink", blockH: "h-[30%]", w: "w-[29%]", fig: "w-[78%]" },
+  { id: "panda", alt: "Panda de vinil", block: "bg-yellow", blockH: "h-[44%]", w: "w-[36%]", fig: "w-[82%]" },
+  { id: "croche", alt: "Coelho de crochê com suéter laranja", block: "checker ring-1 ring-inset ring-line", blockH: "h-[20%]", w: "w-[28%]", fig: "w-[100%]" },
 ];
 
-const SUBJECTS = [
-  { id: "cachorro", label: "Filhote" },
-  { id: "caneca", label: "Caneca" },
-  { id: "pelicano", label: "Pelicano" },
-  { id: "camera", label: "Câmera" },
-  { id: "mel", label: "Mel" },
+/* lote padronizado pelo NoIMG: 640 × 640, alinhados pela base */
+const LOTE = [
+  { id: "coelho2", nome: "Coelho", orig: "554 × 886", from: { x: -6, y: 14, scale: 0.62, rotate: -8 } },
+  { id: "foca", nome: "Foca", orig: "686 × 388", from: { x: 8, y: -10, scale: 1.25, rotate: 6 } },
+  { id: "urso", nome: "Urso", orig: "473 × 744", from: { x: -4, y: 18, scale: 0.74, rotate: -5 } },
+  { id: "boneco", nome: "Boneco", orig: "552 × 721", from: { x: 6, y: -14, scale: 1.18, rotate: 9 } },
+  { id: "dragao", nome: "Dragão", orig: "1004 × 1288", from: { x: -8, y: 8, scale: 0.58, rotate: -10 } },
+  { id: "croche", nome: "Crochê", orig: "1043 × 1766", from: { x: 4, y: -6, scale: 1.12, rotate: 5 } },
 ];
 
-const BACKDROPS = [
-  { id: "transparente", label: "Transparente", cls: "checker" },
-  { id: "branco", label: "Branco de loja", cls: "bg-white" },
-  { id: "gelo", label: "Azul gelo", cls: "bg-primary-light" },
-  { id: "lagoa", label: "Lagoa", img: "/img/lagoa.jpg" },
-  { id: "neblina", label: "Neblina", img: "/img/neblina.jpg" },
-  { id: "neve", label: "Picos nevados", img: "/img/picos-neve.jpg" },
+const DUVIDAS: [string, string][] = [
+  ["Minhas imagens vão para algum servidor?", "Não. O NoIMG roda inteiro no seu computador. As imagens não saem da sua máquina, nem para processar, nem para guardar."],
+  ["Remover o fundo diminui a qualidade?", "Não. O recorte sai no mesmo tamanho da foto original, em PNG. Só as bordas recebem correção de cor, para não carregar o tom do fundo antigo."],
+  ["Se eu melhorar um PNG sem fundo, ele continua transparente?", "Continua. A cor e a transparência são ampliadas separadamente, sem contorno escuro em volta."],
+  ["Como deixo vários personagens do mesmo tamanho?", "Em Melhorar, ligue Padronizar tamanho e solte até 30 imagens. Todas saem com o mesmo tamanho, a mesma margem e a mesma nitidez, e você baixa tudo num ZIP."],
 ];
 
-const SAMPLES: { img: string; name: string; mode: Mode; tall?: boolean }[] = [
-  { img: "cachorro", name: "Filhote no deck", mode: "removebg", tall: true },
-  { img: "montanha", name: "Montanha", mode: "upscale" },
-  { img: "caneca", name: "Caneca antiga", mode: "removebg" },
-  { img: "retrato", name: "Retrato no campo", mode: "upscale", tall: true },
-  { img: "pelicano", name: "Pelicano", mode: "removebg" },
-  { img: "vaca", name: "Vaca das Highlands", mode: "removebg" },
-  { img: "lago", name: "Lago entre pinheiros", mode: "upscale", tall: true },
-  { img: "camera", name: "Câmera de filme", mode: "removebg" },
-  { img: "leopardo", name: "Leopardo na trilha", mode: "removebg" },
-  { img: "pinheiros-neve", name: "Pinheiros na neve", mode: "upscale" },
-  { img: "dente-de-leao", name: "Dente-de-leão", mode: "removebg", tall: true },
-  { img: "mel", name: "Mel escorrendo", mode: "removebg" },
+const CREDITOS: [string, string][] = [
+  ["Xander Sauviller", "xandersauviller"],
+  ["Mockup Graphics", "mockupgraphics"],
+  ["Prats", "momentsbyprats"],
+  ["Dominik Wang", "dominikwang"],
+  ["Maohao Lan", "maohaolan"],
+  ["Molnj", "molnj"],
 ];
 
-const FAQ = [
-  {
-    question: "Minhas imagens são enviadas para algum servidor?",
-    answer: "Não. O NoIMG roda inteiro no seu computador. As imagens não saem da sua máquina, nem para processar, nem para guardar.",
-  },
-  {
-    question: "Remover o fundo diminui a qualidade?",
-    answer: "Não. O recorte sai no mesmo tamanho da foto original, em PNG sem perdas. Os pixels do objeto continuam idênticos, só as bordas recebem correção de cor para não carregar o tom do fundo antigo.",
-  },
-  {
-    question: "Se eu melhorar um PNG sem fundo, ele continua transparente?",
-    answer: "Sim. A cor e a transparência são ampliadas separadamente, então o resultado continua sem fundo e sem aquele contorno escuro em volta do objeto.",
-  },
-  {
-    question: "Qual a diferença entre Rápido e Máxima qualidade?",
-    answer: "Os dois usam o Real-ESRGAN. O Rápido usa um modelo compacto e termina em segundos. O Máxima qualidade usa o modelo completo, recupera mais textura e leva bem mais tempo em computadores sem placa de vídeo.",
-  },
-  {
-    question: "Quais formatos posso usar?",
-    answer: "JPG, PNG e WEBP na entrada. O resultado sempre sai em PNG, para não perder qualidade.",
-  },
-];
-
-interface Credit {
-  file: string;
-  author: string;
-  source: string;
+function Lines({ lines }: { lines: string[] }) {
+  return (
+    <>
+      {lines.map((l) => (
+        <span key={l} className="line">
+          <span data-line>{l}</span>
+        </span>
+      ))}
+    </>
+  );
 }
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("removebg");
-  const [incoming, setIncoming] = useState<File | null>(null);
-  const [subject, setSubject] = useState(SUBJECTS[0].id);
-  const [backdrop, setBackdrop] = useState(BACKDROPS[3].id);
-  const [credits, setCredits] = useState<Credit[]>([]);
+  const [wide, setWide] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const onWide = useCallback((w: boolean) => setWide(w), []);
 
-  useEffect(() => {
-    fetch("/img/creditos.json")
-      .then((r) => r.json())
-      .then(setCredits)
-      .catch(() => setCredits([]));
-  }, []);
-
-  const go = (href: string) => document.querySelector(href)?.scrollIntoView({ behavior: "smooth", block: "start" });
-
-  const trySample = async (s: (typeof SAMPLES)[number]) => {
-    setMode(s.mode);
-    setIncoming(await fileFromUrl(`/img/${s.img}.jpg`, `${s.img}.jpg`));
-    go("#topo");
+  const openTool = (m: Mode) => {
+    setMode(m);
+    document.querySelector("#ferramenta")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const bd = BACKDROPS.find((b) => b.id === backdrop)!;
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        /* entrada: blocos sobem da base, personagens pousam com um quique pequeno, título sobe por linha */
+        const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+        tl.from(".hero-title [data-line]", { yPercent: 105, duration: 0.7, stagger: 0.07 }, 0)
+          .from(".vit-block", { scaleY: 0, transformOrigin: "50% 100%", duration: 0.55, stagger: 0.08 }, 0.25)
+          .from(".vit-fig", { y: -60, opacity: 0, duration: 0.6, stagger: 0.08, ease: "back.out(2.2)" }, 0.5)
+          .from(".hero-card", { y: 24, opacity: 0, duration: 0.6 }, 0.3);
+
+        gsap.utils.toArray<HTMLElement>("[data-reveal-title]").forEach((el) => {
+          gsap.from(el.querySelectorAll("[data-line]"), {
+            yPercent: 105,
+            duration: 0.7,
+            stagger: 0.07,
+            ease: "power3.out",
+            scrollTrigger: { trigger: el, start: "top 85%", once: true },
+          });
+        });
+        gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((el) => {
+          gsap.from(el, { y: 40, opacity: 0, duration: 0.7, ease: "power3.out", scrollTrigger: { trigger: el, start: "top 85%", once: true } });
+        });
+
+        /* padronizar: o lote bagunçado se alinha na base enquanto rola */
+        const stage = document.querySelector<HTMLElement>(".lote-stage");
+        if (stage) {
+          const t = gsap.timeline({ scrollTrigger: { trigger: stage, start: "top top", end: "+=120%", scrub: 0.6, pin: true } });
+          LOTE.forEach((l, i) => {
+            t.from(`.lote-${l.id}`, { xPercent: l.from.x, yPercent: l.from.y, scale: l.from.scale, rotate: l.from.rotate, ease: "power2.inOut", duration: 1 }, i * 0.06);
+          });
+          t.from(".lote-tile", { opacity: 0, duration: 0.3 }, 0.6)
+            .fromTo(".lote-orig", { opacity: 1 }, { opacity: 0, duration: 0.2 }, 0.75)
+            .fromTo(".lote-final", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 0.8);
+        }
+      });
+    },
+    { scope: root },
+  );
 
   return (
-    <div className="overflow-x-clip">
-      {/* ---------- topo ---------- */}
-      <header className="fixed inset-x-0 top-0 z-50 flex h-[var(--header-height)] items-center px-4 md:px-8">
-        <a
-          href="#topo"
-          className="flex items-center gap-2 rounded-full border border-line bg-white/80 p-1.5 sm:pr-4 text-lg font-bold tracking-tight text-ink shadow-md backdrop-blur-md"
-          aria-label="NoIMG, início"
-        >
-          <img src="/favicon.svg" alt="" className="h-8 w-8" />
-          <span className="hidden sm:inline">NoIMG</span>
-        </a>
-        <SpotlightNavbar items={NAV} className="mx-auto hidden pt-0 md:flex" onItemClick={(item) => go(item.href)} />
-        <span className="ml-auto hidden w-[104px] md:block" aria-hidden />
-        <button onClick={() => go("#topo")} className="ml-auto rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white md:hidden">
-          Abrir ferramenta
-        </button>
+    <div ref={root} className="overflow-x-clip">
+      {/* ---------- barra ---------- */}
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-line bg-white">
+        <div className="mx-auto flex h-16 max-w-[1320px] items-center px-5 sm:px-8">
+          <a href="#topo" className="display flex items-center gap-2 text-[24px]" aria-label="NoIMG, início">
+            <img src="/favicon.svg" alt="" className="h-7 w-7" />
+            NoIMG
+          </a>
+          <nav className="ml-auto hidden gap-7 sm:flex" aria-label="Seções">
+            {NAV.map(([label, href]) => (
+              <a key={href} href={href} className="text-[15px] font-medium text-ink-2 hover:text-ink">
+                {label}
+              </a>
+            ))}
+          </nav>
+        </div>
       </header>
 
-      {/* ---------- hero + ferramenta ---------- */}
-      <section id="topo" className="relative isolate flex min-h-[100svh] flex-col items-center px-4 pt-32 pb-20">
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_50%_0%,var(--primary-light),transparent_70%)]" />
-
-        {COLLAGE.map((c, i) => (
-          <motion.div
-            key={c.src}
-            aria-hidden
-            initial={{ opacity: 0, y: 30, scale: 0.92 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 0.5 + i * 0.12, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className={cn("absolute hidden rounded-xl border border-line p-3 shadow-lg xl:block", c.tile, c.cls)}
-          >
-            <img src={c.src} alt={c.alt} className="h-auto w-full drop-shadow-[0_10px_18px_rgba(23,45,58,0.25)]" />
-          </motion.div>
-        ))}
-
-        <h1 className="max-w-4xl text-center text-[clamp(2.6rem,7vw,5.6rem)] leading-[0.95] font-extrabold tracking-[-0.04em] text-ink [font-variation-settings:'opsz'_96]">
-          <TextAnimation delay={0.1}>Fotos mais nítidas.</TextAnimation>
-          <br />
-          <span className="text-primary">
-            <TextAnimation delay={0.35}>Fundos que somem.</TextAnimation>
-          </span>
-        </h1>
-        <p className="mt-6 max-w-xl text-center text-lg text-ink-2">
-          Duas ferramentas de imagem que rodam no seu computador. Nada é enviado para a internet e nada perde resolução.
-        </p>
-
-        <div className="mt-10 flex w-full justify-center">
-          <Workspace mode={mode} onModeChange={setMode} incoming={incoming} />
-        </div>
-
-        {/* recortes em linha no celular */}
-        <div className="mt-10 flex gap-3 xl:hidden" aria-hidden>
-          {COLLAGE.map((c) => (
-            <div key={c.src} className={cn("w-20 rounded-lg border border-line p-1.5 sm:w-28", c.tile)}>
-              <img src={c.src} alt="" className="h-auto w-full" />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------- removedor de fundo ---------- */}
-      <section id="removedor" className="scroll-mt-20 bg-surface px-4 py-24">
-        <div className="mx-auto grid max-w-[var(--container-width)] items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-          <div>
-            <h2 className="text-4xl leading-tight font-bold tracking-tight md:text-5xl">{TOOLS.removebg.title}</h2>
-            <p className="mt-5 max-w-md text-lg text-ink-2">{TOOLS.removebg.text}</p>
-
-            <p className="mt-10 mb-3 text-sm font-medium text-ink-3">Objeto</p>
-            <div className="flex flex-wrap gap-2">
-              {SUBJECTS.map((s) => (
-                <Chip key={s.id} active={s.id === subject} onClick={() => setSubject(s.id)}>
-                  {s.label}
-                </Chip>
-              ))}
-            </div>
-            <p className="mt-6 mb-3 text-sm font-medium text-ink-3">Novo fundo</p>
-            <div className="flex flex-wrap gap-2">
-              {BACKDROPS.map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => setBackdrop(b.id)}
-                  aria-pressed={b.id === backdrop}
-                  title={b.label}
-                  className={cn(
-                    "h-12 w-12 overflow-hidden rounded-md border-2 transition",
-                    b.id === backdrop ? "border-primary ring-4 ring-primary-light" : "border-line hover:border-line-hover",
-                    b.cls,
-                  )}
-                >
-                  {b.img && <img src={b.img} alt="" className="h-full w-full object-cover" />}
-                  <span className="sr-only">{b.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => {
-                setMode("removebg");
-                go("#topo");
-              }}
-              className="mt-10 rounded-full bg-primary px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-primary-hover"
-            >
-              {TOOLS.removebg.cta}
-            </button>
-          </div>
-
-          <div className={cn("relative aspect-[4/3] overflow-hidden rounded-xl border border-line shadow-lg", bd.cls)}>
-            <AnimatePresence initial={false}>
-              {bd.img && (
-                <motion.img key={bd.id} src={bd.img} alt="" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.45 }} className="absolute inset-0 h-full w-full object-cover" />
+      {/* ---------- vitrine + ferramenta ---------- */}
+      <div className="bg-page-alt">
+        <section id="topo" className={cn("mx-auto max-w-[1320px] px-5 pt-24 pb-14 sm:px-8 lg:pt-28", wide ? "lg:pb-24" : "lg:pb-0")}>
+          <div className={cn("grid gap-4 sm:gap-8 lg:gap-10", wide ? "lg:grid-cols-1" : "lg:grid-cols-12")}>
+            {/* esquerda: título atrás dos personagens */}
+            <div className={cn("relative", !wide && "lg:col-span-7 lg:min-h-[740px]")}>
+              <h1 className={cn("hero-title display relative z-0 text-ink", wide ? "text-[clamp(2.4rem,5vw,4rem)]" : "text-[clamp(3.1rem,8.4vw,7.6rem)]")}>
+                <Lines lines={["Recortados,", "nítidos,", "iguais."]} />
+              </h1>
+              {!wide && (
+                <>
+                  <div aria-label="Personagens recortados pelo NoIMG" className="relative z-10 hidden items-end gap-[3%] lg:absolute lg:inset-x-0 lg:bottom-0 lg:flex lg:h-[54%]">
+                    {VITRINE.map((v) => (
+                      <figure key={v.id} className={cn("relative flex h-full flex-col justify-end", v.w)}>
+                        <img src={`/site/vitrine-${v.id}.webp`} alt={v.alt} className={cn("vit-fig relative z-10 mx-auto -mb-[3%] h-auto max-h-[82%] object-contain drop-shadow-[0_14px_18px_rgba(20,20,24,0.18)]", v.fig)} />
+                        <div className={cn("vit-block w-full rounded-t-[6px]", v.block, v.blockH)} />
+                      </figure>
+                    ))}
+                  </div>
+                  {/* celular: faixa curta de personagens entre o título e o cartão */}
+                  <div aria-hidden className="mt-4 flex h-[88px] items-end gap-[3%] sm:h-[200px] lg:hidden">
+                    {VITRINE.map((v) => (
+                      <div key={v.id} className={cn("flex h-full flex-col justify-end", v.w)}>
+                        <img src={`/site/vitrine-${v.id}.webp`} alt="" className={cn("relative z-10 mx-auto -mb-[3%] max-h-[80%] object-contain", v.fig)} />
+                        <div className={cn("w-full rounded-t-[4px]", v.block, v.blockH)} />
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
-            </AnimatePresence>
-            <AnimatePresence mode="wait">
-              <motion.img
-                key={subject}
-                src={`/demo/web/${subject}-sem-fundo.png`}
-                alt={`${SUBJECTS.find((s) => s.id === subject)?.label} sem fundo`}
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                className="absolute inset-x-0 bottom-[6%] mx-auto max-h-[78%] max-w-[70%] object-contain drop-shadow-[0_24px_30px_rgba(23,45,58,0.35)]"
-              />
-            </AnimatePresence>
-            <span className="absolute bottom-3 left-3 rounded-full bg-white/85 px-3 py-1 text-xs text-ink-2 backdrop-blur">
-              Recorte feito pelo NoIMG neste computador
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* ---------- melhorador de qualidade ---------- */}
-      <section id="melhorador" className="scroll-mt-20 px-4 py-24">
-        <div className="mx-auto max-w-[var(--container-width)]">
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <div>
-              <h2 className="text-4xl leading-tight font-bold tracking-tight md:text-5xl">{TOOLS.upscale.title}</h2>
-              <p className="mt-5 max-w-xl text-lg text-ink-2">{TOOLS.upscale.text}</p>
             </div>
-            <button
-              onClick={() => {
-                setMode("upscale");
-                go("#topo");
-              }}
-              className="shrink-0 self-start rounded-full bg-primary px-6 py-3 font-semibold text-white shadow-md transition-colors hover:bg-primary-hover md:self-auto"
-            >
-              {TOOLS.upscale.cta}
+
+            {/* direita: frase de apoio e cartão de envio sobre uma folha rosa */}
+            <div className={cn("hero-card lg:pt-4", !wide && "lg:col-span-5 lg:pb-24")}>
+              <p className="max-w-[40ch] text-[15px] text-ink-2 sm:text-lg">Tire o fundo, aumente a nitidez e deixe todas do mesmo tamanho. Tudo no seu computador.</p>
+              <div className="relative mt-4 mr-2 mb-2 sm:mt-6 sm:mr-3.5 sm:mb-3.5">
+                <div aria-hidden className="absolute inset-0 translate-x-2 translate-y-2 rounded-[14px] bg-pink sm:translate-x-3.5 sm:translate-y-3.5" />
+                <div className="relative">
+                  <Workspace mode={mode} onModeChange={setMode} onWideChange={onWide} />
+                </div>
+              </div>
+              <p className="mt-8 flex items-center gap-2 text-sm text-ink-2">
+                <span className="h-2 w-2 rounded-full bg-[var(--success)]" aria-hidden />
+                Nenhuma imagem sai do seu computador.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* ---------- remover fundo: recorte sobre bloco rosa que sangra até a borda ---------- */}
+      <section id="remover" className="scroll-mt-16 overflow-hidden py-28 lg:py-36">
+        <div className="mx-auto grid max-w-[1320px] items-center gap-12 px-5 sm:px-8 lg:grid-cols-12">
+          <div className="relative z-10 lg:col-span-5">
+            <h2 data-reveal-title className="display text-[clamp(2.6rem,5vw,4.6rem)]">
+              <Lines lines={["Tire o fundo", "sem perder nada."]} />
+            </h2>
+            <p className="mt-6 max-w-[40ch] text-lg text-ink-2">
+              O recorte sai em PNG transparente, no mesmo tamanho da foto. Pronto para loja virtual, anúncio, apresentação ou rede social.
+            </p>
+            <button onClick={() => openTool("removebg")} className="btn-primary mt-8">
+              Remover fundo de uma imagem
             </button>
           </div>
+          <figure data-reveal className="relative lg:col-span-6 lg:col-start-7">
+            <div aria-hidden className="absolute -top-10 bottom-14 left-[22%] -right-[50vw] bg-pink" />
+            <CompareSlider
+              className="checker relative aspect-[4/5] w-[86%] overflow-hidden rounded-[10px]"
+              initial={45}
+              beforeLabel="Foto original"
+              afterLabel="Sem fundo"
+              before={<img src="/site/vaso-foto.webp" alt="Vaso de cerâmica em forma de anel sobre fundo bege" className="h-full w-full object-cover" />}
+              after={<img src="/site/vaso-recorte.webp" alt="O mesmo vaso recortado, com fundo transparente" className="h-full w-full object-cover" />}
+            />
+            <figcaption className="relative mt-5 text-sm text-ink-2">Arraste para comparar: o fundo bege saiu, o vaso ficou inteiro.</figcaption>
+          </figure>
+        </div>
+      </section>
 
-          <div className="mt-12 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <figure>
-              <CompareSlider
-                className="aspect-[3/2] rounded-xl border border-line shadow-lg"
-                initial={45}
-                before={<img src="/demo/web/montanha-pequena.png" alt="Montanha em 360 pixels" className="h-full w-full object-cover" style={{ imageRendering: "pixelated" }} />}
-                after={<img src="/demo/web/montanha-4x.jpg" alt="Montanha ampliada 4 vezes" className="h-full w-full object-cover" />}
-                beforeLabel="360 px"
-                afterLabel="1440 px"
-              />
-              <figcaption className="mt-3 text-sm text-ink-3">Arraste para comparar. Foto de 360 px de largura ampliada 4x no modo Rápido.</figcaption>
-            </figure>
-            <figure>
-              <CompareSlider
-                className="aspect-[3/4] rounded-xl border border-line shadow-lg lg:aspect-auto lg:h-[calc(100%-2rem)]"
-                before={<img src="/demo/web/retrato-pequena.png" alt="Retrato em 300 pixels" className="h-full w-full object-cover" style={{ imageRendering: "pixelated" }} />}
-                after={<img src="/demo/web/retrato-4x.jpg" alt="Retrato ampliado 4 vezes" className="h-full w-full object-cover" />}
-                beforeLabel="300 px"
-                afterLabel="1200 px"
-              />
-              <figcaption className="mt-3 text-sm text-ink-3">Retrato de 300 px, também em 4x.</figcaption>
-            </figure>
+      {/* ---------- melhorar: bloco amarelo sangrando para a esquerda ---------- */}
+      <section id="melhorar" className="scroll-mt-16 overflow-hidden py-28 lg:py-36">
+        <div className="mx-auto grid max-w-[1320px] items-center gap-12 px-5 sm:px-8 lg:grid-cols-12">
+          <figure data-reveal className="relative order-2 lg:order-1 lg:col-span-6">
+            <div aria-hidden className="absolute -top-10 -bottom-10 -left-[50vw] right-[22%] bg-yellow" />
+            <CompareSlider
+              className="relative ml-auto aspect-square w-[86%] overflow-hidden rounded-[10px] bg-ink"
+              initial={50}
+              beforeLabel="240 px"
+              afterLabel="960 px"
+              before={<img src="/site/melhorar-antes.png" alt="Panda de vinil em 240 pixels" className="h-full w-full object-cover" style={{ imageRendering: "pixelated" }} />}
+              after={<img src="/site/melhorar-depois.webp" alt="O mesmo panda ampliado 4 vezes" className="h-full w-full object-cover" />}
+            />
+          </figure>
+          <div className="relative z-10 order-1 lg:order-2 lg:col-span-5 lg:col-start-8">
+            <h2 data-reveal-title className="display text-[clamp(2.6rem,5vw,4.6rem)]">
+              <Lines lines={["Aumente", "sem borrar."]} />
+            </h2>
+            <p className="mt-6 max-w-[40ch] text-lg text-ink-2">Amplie 2x ou 4x com IA. A nitidez volta, os serrilhados somem, e imagens sem fundo continuam sem fundo.</p>
+            <p className="display mt-6 text-4xl">
+              240 px <span className="text-ink-3">→</span> 960 px
+            </p>
+            <button onClick={() => openTool("upscale")} className="btn-primary mt-8">
+              Melhorar uma imagem
+            </button>
           </div>
         </div>
       </section>
 
-      {/* ---------- privacidade, sobre foto ---------- */}
-      <section className="relative isolate overflow-hidden px-4 py-28 text-white">
-        <img src="/img/cordilheira.jpg" alt="" className="absolute inset-0 -z-20 h-full w-full object-cover" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#172D3A]/90 via-[#172D3A]/70 to-[#172D3A]/30" />
-        <div className="mx-auto max-w-[var(--container-width)]">
-          <h2 className="max-w-2xl text-4xl leading-tight font-bold tracking-tight md:text-5xl">Suas imagens não saem do seu computador.</h2>
-          <p className="mt-5 max-w-xl text-lg text-white/80">
-            Os modelos de IA ficam instalados na sua máquina. Funciona até sem internet, e nenhuma foto fica guardada em servidor de ninguém.
-          </p>
-          <dl className="mt-14 grid max-w-3xl gap-10 sm:grid-cols-3">
-            <Stat icon={ShieldCheck} value={0} label="imagens enviadas para a internet" />
-            <Stat icon={Cpu} value={4} suffix="x" label="de ampliação, com ou sem fundo" />
-            <Stat icon={FileImage} value={100} suffix="%" label="da resolução mantida no recorte" />
-          </dl>
-        </div>
-      </section>
-
-      {/* ---------- como funciona ---------- */}
-      <section className="bg-surface px-4 py-24">
-        <div className="mx-auto max-w-[var(--container-width)]">
-          <h2 className="text-4xl font-bold tracking-tight md:text-5xl">Três passos</h2>
-          <ol className="mt-12 grid gap-8 md:grid-cols-3">
-            {[
-              ["Escolha a ferramenta", "Remover fundo ou melhorar a qualidade. Dá para usar uma depois da outra."],
-              ["Solte a imagem", "Arraste o arquivo para a área de envio ou clique para escolher. Aceita JPG, PNG e WEBP."],
-              ["Baixe o PNG", "Compare o antes e depois e baixe o resultado no tamanho final, sem compressão."],
-            ].map(([t, d], i) => (
-              <li key={t} className="border-t-2 border-primary pt-6">
-                <span className="text-5xl font-extrabold text-secondary">{i + 1}</span>
-                <h3 className="mt-3 text-xl font-semibold">{t}</h3>
-                <p className="mt-2 text-ink-2">{d}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* ---------- exemplos ---------- */}
-      <section id="exemplos" className="scroll-mt-20 px-4 py-24">
-        <div className="mx-auto max-w-[var(--container-width)]">
-          <h2 className="text-4xl font-bold tracking-tight md:text-5xl">Experimente com uma foto nossa</h2>
-          <p className="mt-4 max-w-xl text-lg text-ink-2">Clique numa foto para abrir na ferramenta certa. Todas têm licença livre do Unsplash.</p>
-          <div className="mt-12 columns-2 gap-4 md:columns-3 lg:columns-4">
-            {SAMPLES.map((s) => (
-              <button
-                key={s.img}
-                onClick={() => trySample(s)}
-                className="group relative mb-4 block w-full break-inside-avoid overflow-hidden rounded-lg border border-line text-left shadow-sm"
-              >
-                <img src={`/img/${s.img}.jpg`} alt={s.name} loading="lazy" className={cn("w-full object-cover transition duration-500 group-hover:scale-[1.04]", s.tall ? "aspect-[3/4]" : "aspect-[4/3]")} />
-                <span className="absolute inset-x-2 bottom-2 flex items-center justify-between rounded-md bg-white/90 px-3 py-2 text-sm backdrop-blur">
-                  <span className="font-medium text-ink">{s.name}</span>
-                  <span className="text-ink-3">{s.mode === "removebg" ? "Remover fundo" : "Melhorar"}</span>
-                </span>
+      {/* ---------- padronizar: bloco escuro, o lote se alinha com a rolagem ---------- */}
+      <section id="padronizar" className="lote-stage bg-ink py-28 text-white lg:py-32">
+        <div className="mx-auto w-full max-w-[1320px] px-5 sm:px-8">
+          <div className="grid gap-6 lg:grid-cols-12">
+            <h2 data-reveal-title className="display text-[clamp(2.6rem,5vw,4.6rem)] lg:col-span-6">
+              <Lines lines={["Todos do", "mesmo tamanho."]} />
+            </h2>
+            <div className="lg:col-span-5 lg:col-start-8">
+              <p className="max-w-[42ch] text-lg text-white/75">
+                Personagens recortados em tamanhos diferentes saem com o mesmo enquadramento, a mesma margem e a mesma nitidez. Até 30 de uma vez, num ZIP.
+              </p>
+              <button onClick={() => openTool("upscale")} className="btn-primary mt-6">
+                Padronizar um lote
               </button>
+            </div>
+          </div>
+
+          <div className="relative mt-14 grid grid-cols-3 gap-3 sm:gap-4 lg:grid-cols-6">
+            {LOTE.map((l) => (
+              <figure key={l.id}>
+                <div className="relative aspect-square">
+                  <div aria-hidden className="lote-tile checker absolute inset-0 rounded-[8px]" />
+                  <img src={`/site/lote-${l.id}.webp`} alt={`${l.nome} padronizado em 640 × 640 px`} className={`lote-${l.id} relative h-full w-full`} />
+                </div>
+                <figcaption className="mt-2 text-sm leading-snug">
+                  <span className="block font-semibold">{l.nome}</span>
+                  <span className="relative block whitespace-nowrap text-white/70 tabular-nums">
+                    <span className="lote-orig absolute left-0 opacity-0">{l.orig}</span>
+                    <span className="lote-final">640 × 640</span>
+                  </span>
+                </figcaption>
+              </figure>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- privacidade ---------- */}
+      <section className="py-28 lg:py-36">
+        <div className="mx-auto max-w-[1320px] px-5 sm:px-8">
+          <div data-reveal className="grid items-end gap-8 rounded-[16px] bg-pink px-6 py-14 sm:px-12 lg:grid-cols-12 lg:py-20">
+            <h2 className="display text-[clamp(2.6rem,5.2vw,4.8rem)] lg:col-span-7">Nada sai do seu computador.</h2>
+            <p className="max-w-[40ch] text-lg text-ink lg:col-span-5">
+              Os modelos de IA ficam instalados na sua máquina. Funciona sem internet, e nenhuma imagem é guardada em servidor de ninguém.
+            </p>
           </div>
         </div>
       </section>
 
       {/* ---------- dúvidas ---------- */}
-      <section id="duvidas" className="scroll-mt-20 bg-surface px-4 py-24">
-        <div className="mx-auto max-w-3xl">
-          <h2 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl">Dúvidas comuns</h2>
-          <FaqAccordion items={FAQ} title="" className="py-0" />
+      <section id="duvidas" className="scroll-mt-16 pb-28">
+        <div className="mx-auto grid max-w-[1320px] gap-10 px-5 sm:px-8 lg:grid-cols-12">
+          <h2 className="display text-[clamp(2rem,3.6vw,3.2rem)] lg:col-span-4">Dúvidas</h2>
+          <div className="lg:col-span-8">
+            {DUVIDAS.map(([q, a]) => (
+              <details key={q} className="group border-t border-line last:border-b">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-lg font-semibold [&::-webkit-details-marker]:hidden">
+                  {q}
+                  <Plus className="h-5 w-5 shrink-0 text-ink-2 transition-transform duration-200 group-open:rotate-45" strokeWidth={1.75} aria-hidden />
+                </summary>
+                <p className="max-w-[60ch] pb-6 text-ink-2">{a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ---------- rodapé ---------- */}
-      <footer className="relative isolate overflow-hidden px-4 pt-20 pb-10">
-        <img src="/img/neblina.jpg" alt="" className="absolute inset-0 -z-20 h-full w-full object-cover opacity-40" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-page via-page/90 to-page/60" />
-        <div className="mx-auto max-w-[var(--container-width)]">
-          <p className="text-[clamp(3rem,12vw,9rem)] leading-none font-extrabold tracking-[-0.05em] text-primary/90">NoIMG</p>
-          <p className="mt-4 max-w-md text-ink-2">Remoção de fundo com ISNet e ampliação com Real-ESRGAN, rodando localmente.</p>
-          {credits.length > 0 && (
-            <details className="mt-10 text-sm text-ink-3">
-              <summary className="cursor-pointer font-medium text-ink-2">Créditos das fotos</summary>
-              <ul className="mt-3 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
-                {credits.map((c) => (
-                  <li key={c.file}>
-                    <a href={c.source} target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-primary hover:underline">
-                      {c.author}
-                    </a>{" "}
-                    no Unsplash ({c.file.replace(".jpg", "")})
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
+      <footer className="border-t border-line px-5 py-10 sm:px-8">
+        <div className="mx-auto flex max-w-[1320px] flex-col justify-between gap-4 text-sm text-ink-2 lg:flex-row">
+          <p>
+            <span className="display text-base text-ink">NoIMG</span>: remoção de fundo com ISNet e ampliação com Real-ESRGAN, no seu computador.
+          </p>
+          <p>
+            Fotos do Unsplash por{" "}
+            {CREDITOS.map(([nome, user], i) => (
+              <span key={user}>
+                <a href={`https://unsplash.com/@${user}`} target="_blank" rel="noreferrer" className="underline decoration-ink/25 underline-offset-2 hover:text-primary">
+                  {nome}
+                </a>
+                {i < CREDITOS.length - 2 ? ", " : i === CREDITOS.length - 2 ? " e " : "."}
+              </span>
+            ))}
+          </p>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "rounded-full border px-4 py-2 text-sm font-medium transition-colors",
-        active ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink-2 hover:border-line-hover hover:text-ink",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Stat({ icon: Icon, value, suffix, label }: { icon: typeof ShieldCheck; value: number; suffix?: string; label: string }) {
-  return (
-    <div>
-      <Icon className="h-6 w-6 text-secondary" aria-hidden />
-      <dd className="mt-3 text-6xl font-extrabold tracking-tight">
-        <StatsCounter value={value} suffix={suffix} />
-      </dd>
-      <dt className="mt-1 text-white/75">{label}</dt>
     </div>
   );
 }

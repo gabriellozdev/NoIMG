@@ -1,111 +1,118 @@
 @import "tailwindcss";
 
 /* ========================================
-   ICE BLUE DESIGN SYSTEM (tokens do cliente)
+   NoIMG — "Vitrine da Coleção"
+   Personagens recortados sobre blocos de cor chapada.
+   Cobalto é só para ação; rosa e amarelo são só para os blocos.
 ======================================== */
 :root {
   color-scheme: light;
 
-  --primary: #397ca8;
-  --primary-hover: #2e668d;
-  --primary-active: #245575;
-  --primary-light: #e5f1f8;
-  --primary-soft: #f0f7fb;
-  --secondary: #85b9d8;
-  --secondary-hover: #6da6ca;
+  --primary: #2e4bff; /* cobalto: botões, foco, interruptor */
+  --primary-hover: #2238e0;
+  --primary-active: #1a2cb8;
+  --primary-light: #e8ecff;
 
-  --bg-primary: #edf4f8;
-  --bg-secondary: #f5f9fc;
-  --bg-surface: #ffffff;
-  --bg-surface-hover: #f7fafc;
-  --bg-surface-active: #edf4f8;
-  --bg-input: #ffffff;
+  --pink: #ffb3c7; /* bochecha do coelho: blocos e folha sob o cartão */
+  --yellow: #ffe27a; /* bloco do panda */
 
-  --text-primary: #172d3a;
-  --text-secondary: #526b7a;
-  --text-muted: #718794;
-  --text-disabled: #aabac4;
-  --text-inverse: #ffffff;
+  --ink: #141418;
+  --ink-2: #4a4a55;
+  --ink-3: #6b6b76;
+  --line: #e4e4e9;
+  --muted: #f2f2f4; /* xadrez, campos, áreas neutras */
+  --page-alt: #f7f7f8;
 
-  --border: #d5e2e9;
-  --border-hover: #a8c4d5;
-  --border-focus: #397ca8;
+  --success: #157a52;
+  --error: #b42525;
 
-  --success: #21865a;
-  --success-bg: #e8f6ef;
-  --error: #d84b4b;
-  --error-bg: #fdecec;
-  --warning: #b98228;
-  --warning-bg: #fff6e4;
-  --info: #397ca8;
-  --info-bg: #e8f2f9;
-
-  --upload-bg: #f6fafd;
-  --upload-border: #a8c9de;
-  --upload-hover: #eaf4fa;
-  --upload-active: #dcecf6;
-
-  --shadow-sm: 0 1px 3px rgba(23, 45, 58, 0.06);
-  --shadow-md: 0 4px 12px rgba(23, 45, 58, 0.08);
-  --shadow-lg: 0 12px 32px rgba(23, 45, 58, 0.12);
-
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
-  --radius-full: 999px;
-
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-
-  --container-width: 1200px;
-  --header-height: 72px;
+  --header-height: 64px;
 }
 
 @theme inline {
-  --font-sans: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
 
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-active: var(--primary-active);
   --color-primary-light: var(--primary-light);
-  --color-primary-soft: var(--primary-soft);
-  --color-secondary: var(--secondary);
-  --color-secondary-hover: var(--secondary-hover);
+  --color-pink: var(--pink);
+  --color-yellow: var(--yellow);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --color-page-alt: var(--page-alt);
+}
 
-  --color-page: var(--bg-primary);
-  --color-page-2: var(--bg-secondary);
-  --color-surface: var(--bg-surface);
-  --color-surface-hover: var(--bg-surface-hover);
+@layer components {
+  /* títulos: estreita, pesada, caixa normal */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+  }
+  .line {
+    display: block;
+    overflow: hidden;
+    padding-bottom: 0.08em;
+    margin-bottom: -0.08em;
+  }
+  .line > span {
+    display: block;
+    will-change: transform;
+  }
 
-  --color-ink: var(--text-primary);
-  --color-ink-2: var(--text-secondary);
-  --color-ink-3: var(--text-muted);
-  --color-ink-off: var(--text-disabled);
-
-  --color-line: var(--border);
-  --color-line-hover: var(--border-hover);
-
-  --color-success: var(--success);
-  --color-success-bg: var(--success-bg);
-  --color-error: var(--error);
-  --color-error-bg: var(--error-bg);
-  --color-warning: var(--warning);
-  --color-warning-bg: var(--warning-bg);
-
-  --color-upload: var(--upload-bg);
-  --color-upload-line: var(--upload-border);
-  --color-upload-hover: var(--upload-hover);
-  --color-upload-active: var(--upload-active);
-
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 10px;
+    background: var(--primary);
+    color: #fff;
+    padding: 0.85rem 1.4rem;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 1.2;
+    transition: background-color 150ms ease, transform 150ms ease;
+  }
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+  .btn-primary:active {
+    background: var(--primary-active);
+    transform: scale(0.97);
+  }
+  /* desabilitado: só contorno, nunca cinza chapado */
+  .btn-primary:disabled {
+    background: transparent;
+    color: var(--primary);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 45%, transparent);
+    cursor: progress;
+    transform: none;
+  }
+  .btn-quiet {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 10px;
+    background: var(--muted);
+    color: var(--ink);
+    padding: 0.85rem 1.2rem;
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.2;
+    transition: background-color 150ms ease, transform 150ms ease;
+  }
+  .btn-quiet:hover {
+    background: #e7e7eb;
+  }
+  .btn-quiet:active {
+    transform: scale(0.97);
+  }
 }
 
 html {
@@ -113,39 +120,34 @@ html {
 }
 
 body {
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: #fff;
+  color: var(--ink);
   font-family: var(--font-sans);
-  font-optical-sizing: auto;
+  font-size: 17px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: var(--secondary);
-  color: var(--text-primary);
+  background: var(--pink);
+  color: var(--ink);
 }
 
 :focus-visible {
-  outline: 2px solid var(--border-focus);
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
 
-/* xadrez de transparência: o motivo visual do produto */
+/* xadrez de transparência */
 .checker {
   background-color: #fff;
   background-image:
-    linear-gradient(45deg, var(--primary-light) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--primary-light) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--primary-light) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--primary-light) 75%);
-  background-size: 18px 18px;
-  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
-}
-
-@keyframes border-beam {
-  100% {
-    offset-distance: 100%;
-  }
+    linear-gradient(45deg, #e9e9ee 25%, transparent 25%),
+    linear-gradient(-45deg, #e9e9ee 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e9e9ee 75%),
+    linear-gradient(-45deg, transparent 75%, #e9e9ee 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
