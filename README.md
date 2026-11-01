@@ -24,6 +24,7 @@ Remove image backgrounds while preserving the original resolution.
 - Applies color decontamination to semi-transparent edges using multi-level foreground estimation (Germer et al., 2020).
 - Uses AI-based segmentation (ISNet; BiRefNet on machines with 8 GB+ RAM) with the model's own 1024×1024 preprocessing, switching to aspect-preserving letterbox padding for extreme aspect ratios (≥ 2:1).
 - Refines only the uncertain edge band with a full-resolution RGB guided filter, so cutouts follow the photo's real edges without blurring.
+- Two profiles: **Object** (default, faster), which keeps products solid with crisp edges and no background specks, and **Person or animal**, which preserves hair and fur.
 - Quality is tracked with a reproducible benchmark against hand-annotated alpha mattes (AIM-500, PPM-100): see [docs/benchmark-remocao.md](docs/benchmark-remocao.md).
 
 ### 3. Batch Image Standardization
@@ -67,7 +68,11 @@ The installer automatically:
 
 ## Usage
 
-Double-click `iniciar.bat` to launch NoIMG.
+Double-click `NoIMG.exe` (or `iniciar.bat`) to launch NoIMG.
+
+`NoIMG.exe` handles setup on its own. On first run it finds Python (and offers to install it with winget if missing), creates the virtual environment, installs the dependencies, downloads the models and builds the web interface. Then it starts the server and opens the browser. Later runs skip whatever is already done. Keep its window open while you use the app; closing it stops the server. The exe must stay in the project folder.
+
+To rebuild the exe, run `build_exe.bat`. It uses PyInstaller in a separate `.venv-build`, and the app itself does not depend on it.
 
 The application will be available at:
 

@@ -1,5 +1,10 @@
 # Ambiente Python
 .venv/
+.venv-build/
+
+# Iniciador gerado por build_exe.bat
+/build/
+/NoIMG.exe
 __pycache__/
 *.pyc
 

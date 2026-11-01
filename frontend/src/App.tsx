@@ -121,9 +121,8 @@ export default function App() {
       {/* ---------- barra ---------- */}
       <header className="fixed inset-x-0 top-0 z-50 border-b border-line bg-white">
         <div className="mx-auto flex h-16 max-w-[1320px] items-center px-5 sm:px-8">
-          <a href="#topo" className="display flex items-center gap-2 text-[24px]" aria-label="NoIMG, início">
-            <img src="/favicon.svg" alt="" className="h-7 w-7" />
-            NoIMG
+          <a href="#topo" className="flex items-center" aria-label="NoIMG, início">
+            <img src="/brand/noimg-horizontal.svg" alt="" className="h-10 w-auto" />
           </a>
           <nav className="ml-auto hidden gap-7 sm:flex" aria-label="Seções">
             {NAV.map(([label, href]) => (

@@ -1,0 +1,2 @@
+# Só para gerar o NoIMG.exe (build_exe.bat). O app em si não precisa disto.
+pyinstaller

@@ -374,6 +374,8 @@ def _seg_session(name: str):
     # sem arena/padrões de memória: o pico de RAM cai bastante em máquinas de 4 GB
     opts.enable_cpu_mem_arena = False
     opts.enable_mem_pattern = False
+    # todos os núcleos lógicos: o padrão do ORT usa só os físicos (ISNet num i3 de 2 núcleos: 8,7 s → 7,0 s)
+    opts.intra_op_num_threads = os.cpu_count() or 0
     return ort.InferenceSession(str(MODELS / SEG_MODELS[name][0]), opts, providers=["CPUExecutionProvider"])
 
 
@@ -394,11 +396,20 @@ class MattingConfig:
     gf_eps: float = 1e-4
     contrast: float = 1.0  # >1 encurta a transição da borda (a versão antiga usava 1.6)
     fg: str = "ml"  # estimativa de cor do primeiro plano: "ml" ou "blur"
+    # Objetos de borda firme (produtos, móveis, frutas). Desligado (0) para cabelo e pelos.
+    hard_edges: float = 0.0  # inclinação da curva do alfa em torno de 0,5 (ex.: 4 → borda de ~25% da largura)
+    min_island: float = 0.0  # remove manchas soltas menores que esta fração do maior objeto
+    fill_holes: float = 0.0  # fecha furos fechados menores que esta fração da área do objeto
 
 
 DEFAULT_MATTING = MattingConfig()
 # reproduz exatamente o pipeline anterior, para comparação
 LEGACY_MATTING = MattingConfig(letterbox="never", pad="replicate", norm="minmax", guide="gray", gf_radius=2.0, contrast=1.6, fg="blur")
+# Produtos e objetos de borda firme: borda curta, sem manchas soltas e cor rápida (blur).
+# Nos 19 objetos opacos do benchmark: pixels apagados 20,8% → 10,4%, fundo vazando 2,1% → 0,14%.
+OBJECTS_MATTING = MattingConfig(hard_edges=3.0, min_island=0.02, fill_holes=0.002, fg="blur")
+# Perfis expostos no app: "objetos" (rápido) e "detalhado" (cabelo, pelos, pessoas, animais).
+MATTING_PROFILES = {"objetos": OBJECTS_MATTING, "detalhado": DEFAULT_MATTING}
 
 
 def _model_input(rgb: np.ndarray, letterbox: bool, pad: str, mean) -> tuple[np.ndarray, tuple[int, int, int, int]]:
@@ -544,9 +555,41 @@ def alpha_from_raw(rgb: np.ndarray, m: np.ndarray, cfg: MattingConfig = DEFAULT_
         band = (cv2.dilate(coarse, kernel) - cv2.erode(coarse, kernel)) > 0.05
         coarse = _refine_band(rgb, coarse, band, cfg, r=max(2, int(round(cfg.gf_radius * s))))
     alpha = np.clip(coarse, 0, 1).astype(np.float32)
+    if cfg.hard_edges or cfg.min_island or cfg.fill_holes:
+        alpha = _solidify(alpha, cfg)
     alpha[alpha < 0.02] = 0.0
     alpha[alpha > 0.98] = 1.0
     return alpha
+
+
+def _solidify(alpha: np.ndarray, cfg: MattingConfig) -> np.ndarray:
+    """Para objetos de borda firme: o ISNet deixa partes do objeto semitransparentes
+    ("apagadas") e manchas fracas no fundo. Aqui a transição fica curta, manchas soltas
+    saem e furinhos fechados dentro do objeto são preenchidos."""
+    a = alpha
+    if cfg.hard_edges:
+        a = np.clip((a - 0.5) * cfg.hard_edges + 0.5, 0, 1)
+    solid = (a > 0.5).astype(np.uint8)
+    if cfg.min_island and solid.any():
+        n, lab, st, _ = cv2.connectedComponentsWithStats(solid, connectivity=8)
+        areas = st[1:, cv2.CC_STAT_AREA]
+        small = [i + 1 for i, ar in enumerate(areas) if ar < cfg.min_island * areas.max()]
+        if small:
+            drop = np.isin(lab, small).astype(np.uint8)
+            # leva junto a borda suave em volta da mancha removida
+            drop = cv2.dilate(drop, np.ones((5, 5), np.uint8)) & (1 - np.isin(lab, [i for i in range(1, n) if i not in small]).astype(np.uint8))
+            a = np.where(drop > 0, 0.0, a)
+            solid = (a > 0.5).astype(np.uint8)
+    if cfg.fill_holes and solid.any():
+        holes = (1 - solid).astype(np.uint8)
+        n, lab, st, _ = cv2.connectedComponentsWithStats(holes, connectivity=4)
+        h, w = a.shape
+        x, y, bw, bh, ar = (st[:, i] for i in range(5))
+        inside = (x > 0) & (y > 0) & (x + bw < w) & (y + bh < h)
+        fill = inside & (ar < cfg.fill_holes * int(solid.sum()))
+        fill[0] = False  # rótulo 0 é o próprio objeto
+        a = np.where(fill[lab], 1.0, a)
+    return a.astype(np.float32)
 
 
 def predict_alpha(rgb: np.ndarray, model: str = "auto", cfg: MattingConfig = DEFAULT_MATTING) -> np.ndarray:

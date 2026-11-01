@@ -102,6 +102,31 @@ class NormalizacaoTest(unittest.TestCase):
         self.assertTrue(np.allclose(core._normalize(m, "guarded"), core._normalize(m, "minmax")))
 
 
+class PerfilObjetosTest(unittest.TestCase):
+    def test_solidify_tira_mancha_fecha_furo_e_encurta_borda(self):
+        a = np.zeros((200, 200), np.float32)
+        a[40:160, 40:160] = 1.0
+        a[90:93, 90:93] = 0.0  # furinho dentro do objeto
+        a[5:8, 5:8] = 0.9  # mancha solta no fundo
+        a[40:160, 160] = 0.7  # borda "apagada"
+        out = core._solidify(a, core.OBJECTS_MATTING)
+        self.assertTrue(np.all(out[90:93, 90:93] == 1.0))
+        self.assertTrue(np.all(out[5:8, 5:8] == 0.0))
+        self.assertGreater(float(out[100, 160]), 0.95)
+
+    def test_solidify_preserva_furo_grande_e_objeto_na_borda(self):
+        a = np.zeros((200, 200), np.float32)
+        a[:, :120] = 1.0  # objeto encostado na borda da imagem
+        a[60:140, 30:90] = 0.0  # furo grande (alça de caneca, por ex.)
+        out = core._solidify(a, core.OBJECTS_MATTING)
+        self.assertTrue(np.array_equal(out, a))
+
+    def test_perfis_do_app(self):
+        self.assertEqual(set(core.MATTING_PROFILES), {"objetos", "detalhado"})
+        self.assertIs(core.MATTING_PROFILES["detalhado"], core.DEFAULT_MATTING)
+        self.assertEqual(core.OBJECTS_MATTING.fg, "blur")
+
+
 class PrimeiroPlanoTest(unittest.TestCase):
     def test_ml_recupera_cor_e_preserva_pixels_confiaveis(self):
         img, alpha, fg, _ = _scene(300, 200)

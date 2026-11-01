@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, Check, ChevronDown, Download, ImagePlus, Loader2, PackageOpen, RotateCcw } from "lucide-react";
 import { CompareSlider } from "@/components/CompareSlider";
-import { processImage, type JobResult, type Mode, type Quality, type StandardizeOpts } from "@/lib/api";
+import { processImage, type JobResult, type Mode, type Profile, type Quality, type StandardizeOpts } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const TOOLS: Record<Mode, { title: string; cta: string }> = {
@@ -44,6 +44,7 @@ export function Workspace({ mode, onModeChange, onWideChange }: WorkspaceProps) 
   const [items, setItems] = useState<Item[]>([]);
   const [scale, setScale] = useState<2 | 4>(2);
   const [quality, setQuality] = useState<Quality>("rapido");
+  const [profile, setProfile] = useState<Profile>("objetos");
   const [standardizeOn, setStandardizeOn] = useState(false);
   const [std, setStd] = useState<StandardizeOpts>({ width: 1024, height: 1024, fit: "encaixar", margin: 0.08, align: "base", uniform: true });
   const [running, setRunning] = useState(false);
@@ -100,7 +101,7 @@ export function Workspace({ mode, onModeChange, onWideChange }: WorkspaceProps) 
     for (const it of queue) {
       update(it.key, { kind: "working", progress: 0 });
       try {
-        const result = await processImage(it.file, { mode, scale, quality, standardize: standardize ? std : null }, (progress) =>
+        const result = await processImage(it.file, { mode, scale, quality, profile, standardize: standardize ? std : null }, (progress) =>
           update(it.key, { kind: "working", progress }),
         );
         update(it.key, { kind: "done", result });
@@ -267,6 +268,21 @@ export function Workspace({ mode, onModeChange, onWideChange }: WorkspaceProps) 
                     )}
                   </AnimatePresence>
                 </div>
+              </div>
+            )}
+
+            {mode === "removebg" && (
+              <div className="mt-4">
+                <Segmented
+                  label="Tipo"
+                  value={profile}
+                  onChange={setProfile}
+                  options={[["objetos", "Objeto"], ["detalhado", "Pessoa ou animal"]]}
+                  disabled={running}
+                />
+                <p className="mt-2 text-sm text-ink-2">
+                  {profile === "objetos" ? "Mais rápido. Bordas firmes, sem partes apagadas." : "Mais lento. Preserva cabelo, pelo e bordas finas."}
+                </p>
               </div>
             )}
 

@@ -1,5 +1,6 @@
 export type Mode = "removebg" | "upscale";
 export type Quality = "rapido" | "maximo";
+export type Profile = "objetos" | "detalhado";
 
 export interface StandardizeOpts {
   width: number;
@@ -37,7 +38,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function processImage(
   file: File,
-  opts: { mode: Mode; scale: 2 | 4; quality: Quality; standardize?: StandardizeOpts | null },
+  opts: { mode: Mode; scale: 2 | 4; quality: Quality; profile: Profile; standardize?: StandardizeOpts | null },
   onProgress: (p: number, queued: boolean) => void,
   signal?: AbortSignal,
 ): Promise<JobResult> {
@@ -46,6 +47,7 @@ export async function processImage(
   fd.append("mode", opts.standardize ? "standardize" : opts.mode);
   fd.append("scale", String(opts.scale));
   fd.append("quality", opts.quality);
+  fd.append("profile", opts.profile);
   if (opts.standardize) {
     const s = opts.standardize;
     fd.append("width", String(s.width));

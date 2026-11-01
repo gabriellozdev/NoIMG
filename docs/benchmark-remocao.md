@@ -180,6 +180,31 @@ A resolução de inferência não mudou (1024 px).
 | normal (54): legado → novo | 152,5 → 152,5 | 89,1 → 86,7 | 4,91 → 3,57 | 152,8 → 152,6 | 70,8 → 60,8 | 46/54 |
 | extremo (24): legado → novo | 125,1 → 72,8 | 128,7 → 68,1 | 5,39 → 2,97 | 128,6 → 74,0 | 210,7 → 126,2 | 20/24 |
 
+## Perfil "objetos" (`core.OBJECTS_MATTING`)
+
+O padrão acima é bom em pessoas e animais, mas em objetos opacos simples (frutas, móveis, brinquedos, produtos) o ISNet deixa partes do objeto semitransparentes ("apagadas") e manchas fracas de fundo. O padrão mantém essas manchas fiéis ao modelo. O app agora tem dois perfis: **Objeto** (padrão, mais rápido) e **Pessoa ou animal** (`DEFAULT_MATTING`).
+
+O perfil de objetos é o padrão acrescido de:
+
+- `hard_edges=3`: curva de contraste em torno de 0,5 aplicada ao alfa final;
+- `min_island=0.02`: remove manchas soltas menores que 2% do maior objeto;
+- `fill_holes=0.002`: fecha furos fechados menores que 0,2% da área do objeto;
+- `fg="blur"`: estimativa de cor rápida.
+
+Medido nas 19 imagens de objetos opacos do conjunto normal. "Apagado" é a fração dos pixels opacos da referência que saíram com alfa abaixo de 0,98. "Vazando" é a fração do fundo da referência que saiu com alfa acima de 0,02.
+
+| Perfil | SAD | MSE | Grad | MSE trans | Apagado | Vazando |
+|---|---|---|---|---|---|---|
+| padrão (detalhado) | 114,1 | 62,4 | 2,76 | 47,7 | 20,8% | 2,10% |
+| legado | 111,2 | 62,7 | 3,39 | 53,4 | 14,2% | 0,31% |
+| objetos, borda ×2 | 109,9 | 62,6 | 3,23 | 50,9 | 11,3% | 0,22% |
+| **objetos, borda ×3 (escolhido)** | 109,8 | 63,0 | 3,65 | 55,2 | 10,4% | 0,14% |
+| objetos, borda ×4 | 110,0 | 63,2 | 3,86 | 57,9 | 10,0% | 0,11% |
+
+O ganho em SAD e Conn é pequeno, mas o objeto fica sólido e o fundo deixa de vazar, que é o defeito visível. A transição fica mais curta (Grad e MSE trans pioram), por isso o perfil não serve para cabelo e pelo. Remover manchas e fechar furos não mudou as médias neste conjunto: as duas opções são só proteção. O restante "apagado" (~10%) vem de partes que o modelo não detectou (uma das frutas tem 83% faltando), e o refino não recupera isso.
+
+**Tempo** (i3-3110M, 4 GB, três fotos de produto de 1,7 a 3,8 MP, modelo já carregado): 11–15 s no perfil de objetos e 13–23 s no detalhado. Neste PC as medidas variam uns 20% entre execuções. A cor do primeiro plano leva 2,3 s com `blur` e 8,1 s com `ml`. A inferência do ISNet a 1024 px domina o tempo. Com todos os núcleos lógicos no ONNX Runtime (`intra_op_num_threads`), ela caiu de 8,7 s para 7,0 s. O ISNet exportado só aceita entrada de 1024×1024, então não dá para reduzir a resolução.
+
 ## Limitações que continuam
 
 - **Névoa em cabelo solto:** a previsão do ISNet em cabelo solto é grosseira e deixa uma névoa clara em volta dos fios. O contraste antigo escondia a névoa, mas piorava a borda. O ViTMatte resolve, a um custo alto (seção 5).

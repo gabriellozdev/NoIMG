@@ -42,7 +42,7 @@ def _run(job_id: str, data: bytes, mode: str, opts: dict, name: str):
                 suffix = f"_{opts['width']}x{opts['height']}"
             else:
                 job["progress"] = 0.3
-                out = core.remove_background(img)
+                out = core.remove_background(img, cfg=core.MATTING_PROFILES[opts["profile"]])
                 suffix = "_sem_fundo"
         job.update(
             status="pronto",
@@ -92,11 +92,14 @@ def process():
             "margin": min(max(float(form.get("margin", 0.08)), 0.0), 0.4),
             "align": form.get("align", "centro"),
             "uniform": form.get("uniform", "1") == "1",
+            "profile": form.get("profile", "objetos"),
         }
     except ValueError:
         abort(400, "Parâmetros inválidos")
     if opts["scale"] not in (2, 4):
         abort(400, "Escala inválida")
+    if opts["profile"] not in core.MATTING_PROFILES:
+        abort(400, "Perfil inválido")
     job_id = uuid.uuid4().hex
     JOBS[job_id] = {"status": "enviado", "progress": 0.0}
     threading.Thread(target=_run, args=(job_id, f.read(), mode, opts, f.filename or "imagem"), daemon=True).start()
