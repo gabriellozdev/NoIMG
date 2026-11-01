@@ -1,72 +1,215 @@
 # NoIMG
 
-Ferramenta local com dois modos:
+**A local image processing tool powered by AI.**
 
-1. **Melhorar qualidade**: aumenta a imagem 2x ou 4x com IA (Real-ESRGAN). Se a imagem tiver fundo transparente, o resultado continua transparente.
-2. **Remover fundo**: recorta o objeto na **mesma resolução** da original e salva em PNG sem perdas. Os pixels do objeto continuam idênticos aos da original, e só as bordas semitransparentes recebem correção de cor.
+NoIMG is a desktop-based image processing tool that provides AI-powered upscaling, background removal, and batch image standardization. Everything runs locally on your machine — **your images are never uploaded to external servers.**
 
-Tudo roda no seu PC. Nenhuma imagem é enviada para a internet.
+## Features
 
-### Padronizar tamanho (dentro de "Melhorar qualidade")
-Serve para um lote de personagens ou produtos com tamanhos e nitidez diferentes. Você pode mandar até 30 imagens de uma vez.
+### 1. AI Image Upscaling
 
-1. O NoIMG corta as sobras transparentes de cada imagem, para cada objeto ocupar o mesmo espaço.
-2. Encaixa todas no tamanho escolhido (512, 1024, 2048, 1080×1350 ou personalizado), com margem ajustável. Dá para alinhar pela base, que deixa os personagens no mesmo "chão", ou no centro. Também dá para preencher a tela toda.
-3. Com "Nitidez igual em todas" ligado, cada imagem é levada a 1/2 ou 1/4 do tamanho final e ampliada pelo Real-ESRGAN. Assim as borradas e as nítidas terminam com a mesma textura. Desligue essa opção para preservar o detalhe original das imagens que já são grandes.
-4. No fim, você baixa as imagens uma a uma ou todas num ZIP.
+Enhance image resolution using [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN).
 
-## Como instalar
+- Upscale images by **2× or 4×**.
+- Supports JPG and PNG formats.
+- Preserves transparency in images with alpha channels.
+- Multiple AI models available, balancing processing speed and output quality.
 
-Você precisa de Python 3.12 ou mais novo e de Node.js 20 ou mais novo.
+### 2. Background Removal
 
-1. Clone o repositório.
-2. Dê dois cliques em `instalar.bat`. Ele cria o ambiente Python, baixa os modelos de IA (cerca de 540 MB, conferidos por SHA-256) e gera o site.
+Remove image backgrounds while preserving the original resolution.
 
-Os modelos e o site gerado (`models/` e `web/dist/`) ficam fora do git. Dois modelos passam do limite de 100 MB por arquivo do GitHub.
+- Exports lossless PNG images.
+- Preserves the original RGB values of foreground pixels.
+- Applies color decontamination to semi-transparent edges.
+- Uses AI-based segmentation and high-resolution alpha refinement.
 
-## Como usar
+### 3. Batch Image Standardization
 
-Dê dois cliques em `iniciar.bat`. O navegador abre em http://127.0.0.1:7860.
+Standardize up to **30 images simultaneously**, making it easier to prepare character sprites, product images, and other visual assets with consistent dimensions.
 
-## Frontend
+The process includes:
 
-Fica em `frontend/` e usa React, Vite e Tailwind v4 com o design system Ice Blue (`src/index.css`). Componentes do VengeanceUI (MIT) adaptados para Vite estão em `src/components/ui/`: spotlight-navbar, border-beam, stagger-text, stats-counter e faq-accordion.
+1. **Automatic Cropping:** Removes transparent padding so each object occupies a consistent amount of space.
+2. **Canvas Standardization:** Fits images into predefined sizes (512, 1024, 2048, 1080×1350) or custom dimensions.
+3. **Flexible Alignment:** Aligns objects by their bottom edge or center, with adjustable margins and an optional full-canvas mode.
+4. **Consistent Sharpness:** Optionally resizes images to ½ or ¼ of the target resolution before applying Real-ESRGAN, helping achieve a more consistent texture across images.
+5. **Batch Export:** Download individual results or export the entire batch as a ZIP archive.
 
-- Para desenvolver, rode `npm run dev` em `frontend/` com o `app.py` aberto. O Vite repassa `/api` para a porta 7860.
-- Para publicar, rode `npm run build`. O resultado vai para `web/dist`, que o `app.py` serve.
-- Para regenerar as demos de antes/depois, rode `python gerar_demos.py`. Elas são feitas pelo próprio NoIMG.
-- As fotos vêm do Unsplash (via Lorem Picsum, licença Unsplash). Os créditos ficam em `frontend/public/img/creditos.json` e aparecem no rodapé.
+## Installation
 
-## O que a engenharia reversa (REA) mostrou
+### Requirements
 
-### iLoveIMG: upscale
-- O navegador **não processa nada**. O site envia o arquivo (plupload) para um servidor de trabalho e chama `POST {workerServer}/{apiVersion}/upscale` com `task`, `server_filename` e `scale` (2 ou 4). A resposta é a imagem pronta (`blob`).
-- Opções da página: "Size multiplier" com `data-value="2"` e `data-value="4"`. Limites: 6 MB e `pxsize: 33177600` (≈33 MP na saída). Aceita só JPG e PNG.
-- O modelo de IA fica no servidor e não aparece no código do site. Aqui usamos o **Real-ESRGAN** (o padrão aberto mais usado para isso).
+- Python 3.12+
+- Node.js 20+
 
-### remove.bg: remoção de fundo
-- O servidor devolve um **ZIP** (`ZipCanvas.fromBinary` no bundle) com:
-  - `color.jpg`: a cor do objeto, já com a cor do fundo removida das bordas
-  - `alpha.png`: a máscara de transparência, suave e em resolução total
-  - opcionais: `shadow_color.jpg`, `shadow_alpha.png`, `semi_transparency…`
-- O navegador junta as duas imagens pixel a pixel (`Jt.data[i+3] = alpha.data[i]`) para montar o PNG final.
-- **Por isso a qualidade é boa:** a máscara é calculada à parte, aplicada na resolução original, e a cor das bordas é "descontaminada".
+### Setup
 
-### Como o NoIMG reproduz isso
-| Etapa | remove.bg / iLoveIMG | NoIMG |
+1. Clone this repository:
+
+   ```bash
+   git clone https://github.com/gabriellozdev/NoIMG.git
+   cd NoIMG
+   ```
+
+2. Run `instalar.bat`.
+
+The installer automatically:
+
+- Creates the Python virtual environment.
+- Downloads the required AI models (approximately 540 MB).
+- Verifies downloaded models using SHA-256 checksums.
+- Installs frontend dependencies and builds the web interface.
+
+**Note:** AI models and generated frontend files (`models/` and `web/dist/`) are excluded from Git. Some model files exceed GitHub's 100 MB file size limit.
+
+## Usage
+
+Double-click `iniciar.bat` to launch NoIMG.
+
+The application will be available at:
+
+```text
+http://127.0.0.1:7860
+```
+
+All image processing is performed locally.
+
+## Development
+
+### Frontend Stack
+
+- React
+- Vite
+- Tailwind CSS v4
+- Ice Blue Design System
+
+The frontend is located in `frontend/`, with the main design system defined in `src/index.css`.
+
+The project also includes adapted [VengeanceUI](https://github.com/Ashutoshx7/VengeanceUI) components (MIT License) in `src/components/ui/`:
+
+- Spotlight Navbar
+- Border Beam
+- Stagger Text
+- Stats Counter
+- FAQ Accordion
+
+### Development Server
+
+Run the Vite development server from the `frontend/` directory:
+
+```bash
+npm run dev
+```
+
+Keep `app.py` running simultaneously. Vite proxies `/api` requests to the backend running on port `7860`.
+
+### Production Build
+
+```bash
+npm run build
+```
+
+The generated frontend is placed in `web/dist/` and served directly by `app.py`.
+
+### Demo Generation
+
+To regenerate the before-and-after demonstration images:
+
+```bash
+python gerar_demos.py
+```
+
+All demonstrations are generated using NoIMG's own image processing pipeline.
+
+### Image Credits
+
+Photos used in the interface come from Unsplash (via Lorem Picsum). Image credits are stored in `frontend/public/img/creditos.json` and displayed in the website footer.
+
+---
+
+## Reverse Engineering & Technical Implementation
+
+NoIMG's processing pipeline was developed with reference to the behavior of established image processing services, particularly iLoveIMG and remove.bg.
+
+The following findings come from reverse engineering their publicly delivered frontend code and network interactions.
+
+### iLoveIMG — Image Upscaling
+
+The browser does not perform the actual upscaling. Instead:
+
+- Images are uploaded to a remote processing server using Plupload.
+- The frontend sends a `POST` request to `{workerServer}/{apiVersion}/upscale`.
+- The request includes `task`, `server_filename`, and `scale` (2 or 4).
+- The server returns the processed image as a Blob.
+
+The interface exposes two scaling options: 2× and 4×. The observed limits include a 6 MB upload size and `pxsize: 33177600` (approximately 33 MP output).
+
+The actual server-side AI model is not exposed in the frontend code. NoIMG uses the open-source Real-ESRGAN implementation instead.
+
+### remove.bg — Background Removal
+
+The observed response is a ZIP archive containing separate image layers:
+
+| File | Purpose |
+|---|---|
+| `color.jpg` | Foreground colors with background contamination removed from the edges. |
+| `alpha.png` | Full-resolution transparency mask. |
+| `shadow_color.jpg` | Optional shadow color layer. |
+| `shadow_alpha.png` | Optional shadow transparency mask. |
+| `semi_transparency...` | Additional transparency information when available. |
+
+The browser combines the foreground and alpha layers pixel by pixel to produce the final PNG.
+
+This separation is important: the foreground colors and transparency mask are processed independently, allowing accurate edge reconstruction without unnecessarily modifying the original image.
+
+### NoIMG Implementation
+
+| Processing Stage | Reference Services | NoIMG |
 |---|---|---|
-| Segmentação | modelo próprio no servidor | ISNet (ou BiRefNet em PCs com ≥ 8 GB de RAM), 1024 px |
-| Máscara em alta resolução | `alpha.png` em resolução total | *fast guided filter* usando a foto original como guia |
-| Cor das bordas | `color.jpg` descontaminado | *blur-fusion foreground estimation* (Forte & Pitié) |
-| Junção | canvas no navegador | `numpy`, salvo em PNG sem perdas |
-| Upscale | servidor, 2x/4x | Real-ESRGAN (x4v3 rápido, x4plus/x2plus máximo) |
-| Upscale com transparência | não suportado (só JPG/PNG sem alfa) | RGB e alfa ampliados separadamente, com a cor "vazada" para as áreas transparentes (evita halo escuro) |
+| Segmentation | Proprietary server-side models | ISNet / BiRefNet |
+| High-resolution mask | Full-resolution alpha mask | Fast Guided Filter |
+| Edge decontamination | Processed foreground colors | Blur-Fusion Foreground Estimation |
+| Image composition | Browser Canvas | NumPy |
+| Upscaling | Server-side 2× / 4× processing | Real-ESRGAN |
+| Transparency during upscaling | Limited support | Separate RGB and alpha upscaling |
 
-## Modelos (`models/`)
-- `realesr-general-x4v3.pth`, `RealESRGAN_x4plus.pth`, `RealESRGAN_x2plus.pth`: releases oficiais do xinntao/Real-ESRGAN (BSD-3)
-- `isnet-general-use.onnx`, `birefnet-lite.onnx`: releases do danielgatis/rembg
+**Segmentation models**
+- ISNet (default).
+- BiRefNet (available on systems with at least 8 GB of RAM).
+- 1024 px processing resolution.
 
-## Desempenho neste PC (i3-3110M, 4 GB)
-- Remover fundo: cerca de 15 a 40 s por foto
-- Upscale 2x "Rápido" de 400×400 com transparência: cerca de 30 s. "Máxima qualidade" é cerca de 10x mais lento.
-- Limites de entrada: 4 MP para 2x, 1 MP para 4x, 40 MP para remover fundo
+**Edge refinement**
+
+NoIMG uses Fast Guided Filtering to refine the alpha mask, using the original image as a guide. For foreground color reconstruction, it implements Blur-Fusion Foreground Estimation based on the work of Forte & Pitié.
+
+**Transparency-aware upscaling**
+
+RGB and alpha channels are upscaled separately. Color information is extended into transparent regions to reduce dark halos and unwanted edge artifacts.
+
+---
+
+## AI Models & Dependencies
+
+Models are downloaded automatically during installation and stored in `models/`.
+
+| Model | Source | License |
+|---|---|---|
+| `realesr-general-x4v3.pth` | [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | BSD-3-Clause |
+| `RealESRGAN_x4plus.pth` | [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | BSD-3-Clause |
+| `RealESRGAN_x2plus.pth` | [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | BSD-3-Clause |
+| `isnet-general-use.onnx` | [rembg](https://github.com/danielgatis/rembg) | See upstream repository |
+| `birefnet-lite.onnx` | [rembg](https://github.com/danielgatis/rembg) | See upstream repository |
+
+## Privacy
+
+NoIMG is designed around local processing.
+
+- Images are processed on your computer.
+- No image uploads to external processing servers.
+- AI models are downloaded during installation, not during image processing.
+- Your processed images remain under your control.
+
+---
+
+**Built with Python, React, and open-source AI models.**
