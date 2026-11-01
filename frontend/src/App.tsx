@@ -16,37 +16,41 @@ const NAV: [string, string][] = [
   ["Padronizar", "#padronizar"],
 ];
 
-/* a vitrine: personagens reais recortados pelo NoIMG, cada um sobre um bloco de cor */
+/* a vitrine: produtos reais recortados pelo NoIMG, cada um sobre um bloco de cor */
 const VITRINE = [
-  { id: "coelho", alt: "Coelho branco de vinil", block: "bg-pink", blockH: "h-[30%]", w: "w-[29%]", fig: "w-[78%]" },
-  { id: "panda", alt: "Panda de vinil", block: "bg-yellow", blockH: "h-[44%]", w: "w-[36%]", fig: "w-[82%]" },
-  { id: "croche", alt: "Coelho de crochê com suéter laranja", block: "checker ring-1 ring-inset ring-line", blockH: "h-[20%]", w: "w-[28%]", fig: "w-[100%]" },
+  { id: "bota", alt: "Bota de tecido escuro", block: "bg-pink", blockH: "h-[26%]", w: "w-[40%]", fig: "w-[94%]" },
+  { id: "bolsa", alt: "Bolsa redonda vermelha", block: "bg-yellow", blockH: "h-[42%]", w: "w-[33%]", fig: "w-[84%]" },
+  { id: "frasco-rosa", alt: "Frasco rosa com válvula", block: "checker ring-1 ring-inset ring-line", blockH: "h-[18%]", w: "w-[21%]", fig: "w-[52%]" },
 ];
 
 /* lote padronizado pelo NoIMG: 640 × 640, alinhados pela base */
 const LOTE = [
-  { id: "coelho2", nome: "Coelho", orig: "554 × 886", from: { x: -6, y: 14, scale: 0.62, rotate: -8 } },
-  { id: "foca", nome: "Foca", orig: "686 × 388", from: { x: 8, y: -10, scale: 1.25, rotate: 6 } },
-  { id: "urso", nome: "Urso", orig: "473 × 744", from: { x: -4, y: 18, scale: 0.74, rotate: -5 } },
-  { id: "boneco", nome: "Boneco", orig: "552 × 721", from: { x: 6, y: -14, scale: 1.18, rotate: 9 } },
-  { id: "dragao", nome: "Dragão", orig: "1004 × 1288", from: { x: -8, y: 8, scale: 0.58, rotate: -10 } },
-  { id: "croche", nome: "Crochê", orig: "1043 × 1766", from: { x: 4, y: -6, scale: 1.12, rotate: 5 } },
+  { id: "salto-vermelho", nome: "Salto", orig: "1482 × 901", from: { x: -6, y: 14, scale: 1.2, rotate: -8 } },
+  { id: "relogio", nome: "Relógio", orig: "524 × 712", from: { x: 8, y: -10, scale: 0.6, rotate: 6 } },
+  { id: "oculos", nome: "Óculos", orig: "949 × 587", from: { x: -4, y: 18, scale: 1.15, rotate: -5 } },
+  { id: "pote", nome: "Pote", orig: "504 × 1062", from: { x: 6, y: -14, scale: 0.62, rotate: 9 } },
+  { id: "fone", nome: "Fone", orig: "1010 × 1727", from: { x: -8, y: 8, scale: 1.25, rotate: -10 } },
+  { id: "oxford", nome: "Sapato", orig: "1077 × 953", from: { x: 4, y: -6, scale: 0.7, rotate: 5 } },
 ];
 
 const DUVIDAS: [string, string][] = [
   ["Minhas imagens vão para algum servidor?", "Não. O NoIMG roda inteiro no seu computador. As imagens não saem da sua máquina, nem para processar, nem para guardar."],
   ["Remover o fundo diminui a qualidade?", "Não. O recorte sai no mesmo tamanho da foto original, em PNG. Só as bordas recebem correção de cor, para não carregar o tom do fundo antigo."],
   ["Se eu melhorar um PNG sem fundo, ele continua transparente?", "Continua. A cor e a transparência são ampliadas separadamente, sem contorno escuro em volta."],
-  ["Como deixo vários personagens do mesmo tamanho?", "Em Melhorar, ligue Padronizar tamanho e solte até 30 imagens. Todas saem com o mesmo tamanho, a mesma margem e a mesma nitidez, e você baixa tudo num ZIP."],
+  ["Como deixo vários produtos do mesmo tamanho?", "Em Melhorar, ligue Padronizar tamanho e solte até 30 imagens. Todas saem com o mesmo tamanho, a mesma margem e a mesma nitidez, e você baixa tudo num ZIP."],
 ];
 
 const CREDITOS: [string, string][] = [
-  ["Xander Sauviller", "xandersauviller"],
-  ["Mockup Graphics", "mockupgraphics"],
-  ["Prats", "momentsbyprats"],
-  ["Dominik Wang", "dominikwang"],
-  ["Maohao Lan", "maohaolan"],
-  ["Molnj", "molnj"],
+  ["orhakim", "orhakim"],
+  ["Claire Abdo", "claireabdo"],
+  ["Birgith Roosipuu", "msbirgith"],
+  ["Engin Akyurt", "enginakyurt"],
+  ["Tareq Hasan", "tareq_hasan"],
+  ["Jesper Nice", "jespernice"],
+  ["Musi Studio", "musi_studio"],
+  ["Kiran CK", "kiranck123"],
+  ["Collab Media", "collab_media"],
+  ["K8", "_k8_"],
 ];
 
 function Lines({ lines }: { lines: string[] }) {
@@ -76,7 +80,7 @@ export default function App() {
     () => {
       const mm = gsap.matchMedia();
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        /* entrada: blocos sobem da base, personagens pousam com um quique pequeno, título sobe por linha */
+        /* entrada: blocos sobem da base, produtos pousam com um quique pequeno, título sobe por linha */
         const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
         tl.from(".hero-title [data-line]", { yPercent: 105, duration: 0.7, stagger: 0.07 }, 0)
           .from(".vit-block", { scaleY: 0, transformOrigin: "50% 100%", duration: 0.55, stagger: 0.08 }, 0.25)
@@ -134,15 +138,15 @@ export default function App() {
       {/* ---------- vitrine + ferramenta ---------- */}
       <div className="bg-page-alt">
         <section id="topo" className={cn("mx-auto max-w-[1320px] px-5 pt-24 pb-14 sm:px-8 lg:pt-28", wide ? "lg:pb-24" : "lg:pb-0")}>
-          <div className={cn("grid gap-4 sm:gap-8 lg:gap-10", wide ? "lg:grid-cols-1" : "lg:grid-cols-12")}>
-            {/* esquerda: título atrás dos personagens */}
-            <div className={cn("relative", !wide && "lg:col-span-7 lg:min-h-[740px]")}>
+          <div className={cn("grid gap-4 sm:gap-8 lg:items-start lg:gap-10", wide ? "lg:grid-cols-1" : "lg:grid-cols-12")}>
+            {/* esquerda: título atrás dos produtos */}
+            <div className={cn("relative", !wide && "lg:col-span-7 lg:h-[740px]")}>
               <h1 className={cn("hero-title display relative z-0 text-ink", wide ? "text-[clamp(2.4rem,5vw,4rem)]" : "text-[clamp(3.1rem,8.4vw,7.6rem)]")}>
                 <Lines lines={["Recortados,", "nítidos,", "iguais."]} />
               </h1>
               {!wide && (
                 <>
-                  <div aria-label="Personagens recortados pelo NoIMG" className="relative z-10 hidden items-end gap-[3%] lg:absolute lg:inset-x-0 lg:bottom-0 lg:flex lg:h-[54%]">
+                  <div aria-label="Produtos recortados pelo NoIMG" className="relative z-10 hidden items-end gap-[3%] lg:absolute lg:inset-x-0 lg:bottom-0 lg:flex lg:h-[54%]">
                     {VITRINE.map((v) => (
                       <figure key={v.id} className={cn("relative flex h-full flex-col justify-end", v.w)}>
                         <img src={`/site/vitrine-${v.id}.webp`} alt={v.alt} className={cn("vit-fig relative z-10 mx-auto -mb-[3%] h-auto max-h-[82%] object-contain drop-shadow-[0_14px_18px_rgba(20,20,24,0.18)]", v.fig)} />
@@ -150,7 +154,7 @@ export default function App() {
                       </figure>
                     ))}
                   </div>
-                  {/* celular: faixa curta de personagens entre o título e o cartão */}
+                  {/* celular: faixa curta de produtos entre o título e o cartão */}
                   <div aria-hidden className="mt-4 flex h-[88px] items-end gap-[3%] sm:h-[200px] lg:hidden">
                     {VITRINE.map((v) => (
                       <div key={v.id} className={cn("flex h-full flex-col justify-end", v.w)}>
@@ -198,14 +202,14 @@ export default function App() {
           <figure data-reveal className="relative lg:col-span-6 lg:col-start-7">
             <div aria-hidden className="absolute -top-10 bottom-14 left-[22%] -right-[50vw] bg-pink" />
             <CompareSlider
-              className="checker relative aspect-[4/5] w-[86%] overflow-hidden rounded-[10px]"
+              className="checker relative aspect-[3/2] w-[92%] overflow-hidden rounded-[10px]"
               initial={45}
               beforeLabel="Foto original"
               afterLabel="Sem fundo"
-              before={<img src="/site/vaso-foto.webp" alt="Vaso de cerâmica em forma de anel sobre fundo bege" className="h-full w-full object-cover" />}
-              after={<img src="/site/vaso-recorte.webp" alt="O mesmo vaso recortado, com fundo transparente" className="h-full w-full object-cover" />}
+              before={<img src="/site/mochila-foto.webp" alt="Mochila clara sobre fundo cinza" className="h-full w-full object-cover" />}
+              after={<img src="/site/mochila-recorte.webp" alt="A mesma mochila recortada, com fundo transparente" className="h-full w-full object-cover" />}
             />
-            <figcaption className="relative mt-5 text-sm text-ink-2">Arraste para comparar: o fundo bege saiu, o vaso ficou inteiro.</figcaption>
+            <figcaption className="relative mt-5 text-sm text-ink-2">Arraste para comparar: o fundo cinza saiu, até o vão entre as alças.</figcaption>
           </figure>
         </div>
       </section>
@@ -220,8 +224,8 @@ export default function App() {
               initial={50}
               beforeLabel="240 px"
               afterLabel="960 px"
-              before={<img src="/site/melhorar-antes.png" alt="Panda de vinil em 240 pixels" className="h-full w-full object-cover" style={{ imageRendering: "pixelated" }} />}
-              after={<img src="/site/melhorar-depois.webp" alt="O mesmo panda ampliado 4 vezes" className="h-full w-full object-cover" />}
+              before={<img src="/site/melhorar-antes.png" alt="Relógio em 240 pixels" className="h-full w-full object-cover" style={{ imageRendering: "pixelated" }} />}
+              after={<img src="/site/melhorar-depois.webp" alt="O mesmo relógio ampliado 4 vezes" className="h-full w-full object-cover" />}
             />
           </figure>
           <div className="relative z-10 order-1 lg:order-2 lg:col-span-5 lg:col-start-8">
@@ -248,7 +252,7 @@ export default function App() {
             </h2>
             <div className="lg:col-span-5 lg:col-start-8">
               <p className="max-w-[42ch] text-lg text-white/75">
-                Personagens recortados em tamanhos diferentes saem com o mesmo enquadramento, a mesma margem e a mesma nitidez. Até 30 de uma vez, num ZIP.
+                Produtos e personagens recortados em tamanhos diferentes saem com o mesmo enquadramento, a mesma margem e a mesma nitidez. Até 30 de uma vez, num ZIP.
               </p>
               <button onClick={() => openTool("upscale")} className="btn-primary mt-6">
                 Padronizar um lote

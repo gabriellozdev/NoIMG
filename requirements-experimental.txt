@@ -1,0 +1,5 @@
+-r requirements.txt
+# experimental: refino com ViTMatte (noimg/experimental_vitmatte.py)
+transformers
+# leitura do AIM-500 no benchmark (tests/bench_remocao.py)
+pyarrow

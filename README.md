@@ -21,8 +21,10 @@ Remove image backgrounds while preserving the original resolution.
 
 - Exports lossless PNG images.
 - Preserves the original RGB values of foreground pixels.
-- Applies color decontamination to semi-transparent edges.
-- Uses AI-based segmentation and high-resolution alpha refinement.
+- Applies color decontamination to semi-transparent edges using multi-level foreground estimation (Germer et al., 2020).
+- Uses AI-based segmentation (ISNet; BiRefNet on machines with 8 GB+ RAM) with the model's own 1024×1024 preprocessing, switching to aspect-preserving letterbox padding for extreme aspect ratios (≥ 2:1).
+- Refines only the uncertain edge band with a full-resolution RGB guided filter, so cutouts follow the photo's real edges without blurring.
+- Quality is tracked with a reproducible benchmark against hand-annotated alpha mattes (AIM-500, PPM-100): see [docs/benchmark-remocao.md](docs/benchmark-remocao.md).
 
 ### 3. Batch Image Standardization
 

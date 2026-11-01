@@ -6,6 +6,7 @@ na resolução final sem passar por compressão com perdas.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -60,13 +61,18 @@ def _box(x: np.ndarray, r: int) -> np.ndarray:
     return cv2.boxFilter(x, -1, (2 * r + 1, 2 * r + 1), borderType=cv2.BORDER_REFLECT)
 
 
-def estimate_foreground(img: np.ndarray, alpha: np.ndarray) -> np.ndarray:
-    """Estimativa de cor do primeiro plano por "blur fusion" (Forte & Pitié, 2021).
+def estimate_foreground(img: np.ndarray, alpha: np.ndarray, method: str = "ml") -> np.ndarray:
+    """Cor do primeiro plano nas bordas semitransparentes (cabelo, pelos, vidro).
 
-    Remove o "vazamento" da cor do fundo nas bordas semitransparentes (cabelo, pelos,
-    vidro). É o mesmo papel do color.jpg que o remove.bg entrega separado do alpha.png.
-    Pixels totalmente opacos saem idênticos ao original.
+    Remove o "vazamento" da cor do fundo antigo. É o mesmo papel do color.jpg que o
+    remove.bg entrega separado do alpha.png. Pixels com alfa confiável (>= 0.999) saem
+    idênticos ao original.
+
+    - "ml": estimativa multinível (Germer et al., 2020), padrão; menos halo.
+    - "blur": "blur fusion" (Forte & Pitié, 2021), a versão anterior.
     """
+    if method == "ml":
+        return _estimate_foreground_ml(img, alpha)
     a = alpha[..., None]
     fg = img.copy()
     bg = img.copy()
@@ -80,6 +86,55 @@ def estimate_foreground(img: np.ndarray, alpha: np.ndarray) -> np.ndarray:
     solid = alpha >= 0.999
     fg[solid] = img[solid]
     return fg.astype(np.float32)
+
+
+def _estimate_foreground_ml(img: np.ndarray, alpha: np.ndarray, reg: float = 1e-5, grad_w: float = 1.0) -> np.ndarray:
+    """Estimativa multinível de primeiro plano e fundo (Germer et al., 2020).
+
+    Resolve, de uma resolução minúscula até a original, o sistema
+    I = a·F + (1 − a)·B por pixel, com F e B suaves entre vizinhos (peso maior onde o
+    alfa muda pouco). Iterações de Jacobi vetorizadas; o resultado de cada nível
+    inicializa o próximo. Só a cor de F nas bordas importa: onde o alfa é confiável o
+    original volta intacto.
+    """
+    h0, w0 = alpha.shape
+    n_levels = int(np.ceil(np.log2(max(h0, w0))))
+    mean = img.reshape(-1, 3).mean(0)
+    F = np.broadcast_to(mean, (1, 1, 3)).astype(np.float32).copy()
+    B = F.copy()
+    for lvl in range(n_levels + 1):
+        w = max(1, round(w0 ** (lvl / n_levels)))
+        h = max(1, round(h0 ** (lvl / n_levels)))
+        I = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA) if (w, h) != (w0, h0) else img
+        a = cv2.resize(alpha, (w, h), interpolation=cv2.INTER_AREA) if (w, h) != (w0, h0) else alpha
+        I = I.reshape(h, w, 3)  # o cv2 pode descartar eixos de tamanho 1
+        a = a.reshape(h, w)
+        F = cv2.resize(F, (w, h), interpolation=cv2.INTER_LINEAR).reshape(h, w, 3)
+        B = cv2.resize(B, (w, h), interpolation=cv2.INTER_LINEAR).reshape(h, w, 3)
+        iters = 10 if min(w, h) <= 32 else 2
+        ap = np.pad(a, 1, mode="edge")
+        # pesos dos 4 vizinhos: regularização + gradiente do alfa
+        wts = [reg + grad_w * np.abs(a - ap[1 + dy:1 + dy + h, 1 + dx:1 + dx + w]) for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))]
+        W = sum(wts)
+        a3 = a[..., None]
+        a00 = (W + a * a)[..., None]
+        a01 = (a * (1 - a))[..., None]
+        a11 = (W + (1 - a) ** 2)[..., None]
+        det = a00 * a11 - a01 * a01
+        for _ in range(iters):
+            Fp, Bp = np.pad(F, ((1, 1), (1, 1), (0, 0)), mode="edge"), np.pad(B, ((1, 1), (1, 1), (0, 0)), mode="edge")
+            sF = np.zeros_like(F)
+            sB = np.zeros_like(B)
+            for wt, (dy, dx) in zip(wts, ((-1, 0), (1, 0), (0, -1), (0, 1))):
+                sF += wt[..., None] * Fp[1 + dy:1 + dy + h, 1 + dx:1 + dx + w]
+                sB += wt[..., None] * Bp[1 + dy:1 + dy + h, 1 + dx:1 + dx + w]
+            b0 = a3 * I + sF
+            b1 = (1 - a3) * I + sB
+            F = np.clip((a11 * b0 - a01 * b1) / det, 0, 1).astype(np.float32)
+            B = np.clip((a00 * b1 - a01 * b0) / det, 0, 1).astype(np.float32)
+    solid = alpha >= 0.999
+    F[solid] = img[solid]
+    return F.astype(np.float32)
 
 
 # ---------------------------------------------------------------- upscale
@@ -135,7 +190,7 @@ def _bleed_colors(rgb: np.ndarray, alpha: np.ndarray) -> np.ndarray:
     Sem isso, o modelo "vê" o RGB escondido (geralmente preto/branco) e cria halos
     escuros ao redor do objeto depois do upscale.
     """
-    out = estimate_foreground(rgb, alpha)
+    out = estimate_foreground(rgb, alpha, method="blur")  # upscale: comportamento mantido
     known = (alpha > 0.02).astype(np.float32)
     filled = known > 0
     src = out * known[..., None]
@@ -322,68 +377,189 @@ def _seg_session(name: str):
     return ort.InferenceSession(str(MODELS / SEG_MODELS[name][0]), opts, providers=["CPUExecutionProvider"])
 
 
+@dataclass(frozen=True)
+class MattingConfig:
+    """Opções do pipeline de máscara. Os padrões vêm do benchmark (docs/benchmark-remocao.md)."""
+
+    # Proporção na entrada do modelo (1024×1024):
+    #   "never"  achata a imagem, como no treino do ISNet/BiRefNet (melhor até ~2:1);
+    #   "always" mantém a proporção e completa com padding;
+    #   "auto"   achata até `aspect_limit` e usa padding a partir daí (panorâmicas, banners).
+    letterbox: str = "auto"
+    aspect_limit: float = 2.0
+    pad: str = "mean"  # padding: "mean" (média do modelo = 0 normalizado) ou "replicate" (repete a borda)
+    norm: str = "guarded"  # "guarded", "minmax" (anterior) ou "none"
+    guide: str = "rgb"  # guia do guided filter: "rgb", "gray" ou "none"
+    gf_radius: float = 6.0  # raio do guided filter em pixels de modelo (escala com a imagem)
+    gf_eps: float = 1e-4
+    contrast: float = 1.0  # >1 encurta a transição da borda (a versão antiga usava 1.6)
+    fg: str = "ml"  # estimativa de cor do primeiro plano: "ml" ou "blur"
+
+
+DEFAULT_MATTING = MattingConfig()
+# reproduz exatamente o pipeline anterior, para comparação
+LEGACY_MATTING = MattingConfig(letterbox="never", pad="replicate", norm="minmax", guide="gray", gf_radius=2.0, contrast=1.6, fg="blur")
+
+
+def _model_input(rgb: np.ndarray, letterbox: bool, pad: str, mean) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+    """Leva a imagem a 1024×1024. Com letterbox, o lado maior vira 1024 e o resto é
+    padding; devolve também a janela (topo, esquerda, altura, largura) da imagem útil."""
+    h, w = rgb.shape[:2]
+    if not letterbox:
+        return cv2.resize(rgb, (SEG_SIZE, SEG_SIZE), interpolation=cv2.INTER_AREA), (0, 0, SEG_SIZE, SEG_SIZE)
+    s = SEG_SIZE / max(h, w)
+    nh, nw = max(1, round(h * s)), max(1, round(w * s))
+    small = cv2.resize(rgb, (nw, nh), interpolation=cv2.INTER_AREA if s < 1 else cv2.INTER_CUBIC)
+    top, left = (SEG_SIZE - nh) // 2, (SEG_SIZE - nw) // 2
+    border = (top, SEG_SIZE - nh - top, left, SEG_SIZE - nw - left)
+    if pad == "mean":
+        canvas = cv2.copyMakeBorder(small, *border, cv2.BORDER_CONSTANT, value=tuple(float(m) for m in mean))
+    else:
+        canvas = cv2.copyMakeBorder(small, *border, cv2.BORDER_REPLICATE)
+    return canvas, (top, left, nh, nw)
+
+
 def _segment(small: np.ndarray, name: str) -> np.ndarray:
+    """Roda o modelo com o pré-processamento dele (média/desvio do treino) e devolve
+    a probabilidade de primeiro plano em [0, 1], 1024×1024."""
     _, mean, std, is_prob = SEG_MODELS[name]
     x = ((small - np.array(mean, np.float32)) / np.array(std, np.float32)).transpose(2, 0, 1)[None]
     out = _seg_session(name).run(None, {"input_image": np.ascontiguousarray(x, np.float32)})[0][0, 0]
     return out if is_prob else 1.0 / (1.0 + np.exp(-out))
 
 
-def _fast_guided_upsample(guide_hr: np.ndarray, guide_lr: np.ndarray, p_lr: np.ndarray, r: int, eps: float) -> np.ndarray:
-    """Guided filter rápido (He & Sun): calcula os coeficientes na resolução da máscara
-    e aplica sobre a imagem original em resolução total -> bordas nítidas do original."""
-    mean_i, mean_p = _box(guide_lr, r), _box(p_lr, r)
-    var_i = _box(guide_lr * guide_lr, r) - mean_i * mean_i
-    cov_ip = _box(guide_lr * p_lr, r) - mean_i * mean_p
+def _normalize(m: np.ndarray, how: str) -> np.ndarray:
+    if how == "minmax":  # anterior: estica sempre para 0–1, mesmo previsões fracas
+        return (m - m.min()) / max(float(m.max() - m.min()), 1e-6)
+    if how == "guarded":  # estica no máximo até 0.8 → 1: previsões fracas não viram opacas
+        lo, hi = float(m.min()), max(float(m.max()), 0.8)
+        return np.clip((m - lo) / max(hi - lo, 1e-6), 0, 1)
+    return np.clip(m, 0, 1)
+
+
+def _guided_filter(guide: np.ndarray, p: np.ndarray, r: int, eps: float) -> np.ndarray:
+    """Guided filter (He et al.) com guia de 1 canal."""
+    mean_i, mean_p = _box(guide, r), _box(p, r)
+    var_i = _box(guide * guide, r) - mean_i * mean_i
+    cov_ip = _box(guide * p, r) - mean_i * mean_p
     a = cov_ip / (var_i + eps)
     b = mean_p - a * mean_i
-    a, b = _box(a, r), _box(b, r)
-    h, w = guide_hr.shape[:2]
-    a = cv2.resize(a, (w, h), interpolation=cv2.INTER_LINEAR)
-    b = cv2.resize(b, (w, h), interpolation=cv2.INTER_LINEAR)
-    return a * guide_hr + b
+    return _box(a, r) * guide + _box(b, r)
 
 
-def predict_alpha(rgb: np.ndarray, model: str = "auto") -> np.ndarray:
-    """Máscara alfa suave na resolução ORIGINAL da imagem."""
-    h, w = rgb.shape[:2]
-    small = cv2.resize(rgb, (SEG_SIZE, SEG_SIZE), interpolation=cv2.INTER_AREA)
+def _guided_filter_rgb(I: np.ndarray, p: np.ndarray, r: int, eps: float) -> np.ndarray:
+    """Guided filter com guia colorido (He et al., eq. 19): usa a covariância 3×3 da cor,
+    então separa bordas que têm o mesmo cinza mas cores diferentes (ex.: vermelho sobre verde)."""
+    b = _box
+    mI = b(I, r)
+    mp = b(p, r)
+    Ip = b(I * p[..., None], r)
+    cov_ip = Ip - mI * mp[..., None]
+    # covariância 3×3 simétrica da guia + eps·Id
+    v = {}
+    for i in range(3):
+        for j in range(i, 3):
+            v[i, j] = b(I[..., i] * I[..., j], r) - mI[..., i] * mI[..., j] + (eps if i == j else 0.0)
+    rr, rg, rb, gg, gb, bb = v[0, 0], v[0, 1], v[0, 2], v[1, 1], v[1, 2], v[2, 2]
+    # inversa por cofatores
+    i_rr = gg * bb - gb * gb
+    i_rg = gb * rb - rg * bb
+    i_rb = rg * gb - gg * rb
+    i_gg = rr * bb - rb * rb
+    i_gb = rb * rg - rr * gb
+    i_bb = rr * gg - rg * rg
+    det = rr * i_rr + rg * i_rg + rb * i_rb
+    c0, c1, c2 = cov_ip[..., 0], cov_ip[..., 1], cov_ip[..., 2]
+    a0 = (i_rr * c0 + i_rg * c1 + i_rb * c2) / det
+    a1 = (i_rg * c0 + i_gg * c1 + i_gb * c2) / det
+    a2 = (i_rb * c0 + i_gb * c1 + i_bb * c2) / det
+    bias = mp - a0 * mI[..., 0] - a1 * mI[..., 1] - a2 * mI[..., 2]
+    return b(a0, r) * I[..., 0] + b(a1, r) * I[..., 1] + b(a2, r) * I[..., 2] + b(bias, r)
+
+
+def _refine_band(rgb: np.ndarray, coarse: np.ndarray, band: np.ndarray, cfg: MattingConfig, r: int) -> np.ndarray:
+    """Aplica o guided filter só na caixa que contém a faixa de borda, em tiras
+    horizontais (com margem 2r) para limitar a memória em imagens grandes."""
+    out = coarse.copy()
+    ys, xs = np.nonzero(band)
+    if len(ys) == 0:
+        return out
+    h, w = coarse.shape
+    m = 3 * r
+    y0, y1 = max(0, ys.min() - m), min(h, ys.max() + 1 + m)
+    x0, x1 = max(0, xs.min() - m), min(w, xs.max() + 1 + m)
+    strip = 384
+    for sy in range(y0, y1, strip):
+        ey = min(y1, sy + strip)
+        py0, py1 = max(y0, sy - m), min(y1, ey + m)
+        p = coarse[py0:py1, x0:x1]
+        if cfg.guide == "rgb":
+            q = _guided_filter_rgb(rgb[py0:py1, x0:x1], p, r, cfg.gf_eps)
+        else:
+            q = _guided_filter(cv2.cvtColor(rgb[py0:py1, x0:x1], cv2.COLOR_RGB2GRAY), p, r, cfg.gf_eps)
+        if cfg.contrast != 1.0:
+            q = (q - 0.5) * cfg.contrast + 0.5
+        q = q[sy - py0:ey - py0]
+        sel = band[sy:ey, x0:x1]
+        out[sy:ey, x0:x1][sel] = q[sel]
+    return out
+
+
+def _run_model(small: np.ndarray, model: str) -> np.ndarray:
     global _birefnet_failed
     if model == "auto" and not _birefnet_failed:
         try:
-            m = _segment(small, "birefnet")
+            return _segment(small, "birefnet")
         except Exception:  # falta de RAM: cai para o modelo leve e lembra disso
             _birefnet_failed = True
             _seg_session.cache_clear()
-            m = _segment(small, "isnet")
-    elif model == "auto":
-        m = _segment(small, "isnet")
-    else:
-        m = _segment(small, model)
-    m = (m - m.min()) / max(float(m.max() - m.min()), 1e-6)
+            return _segment(small, "isnet")
+    return _segment(small, "isnet" if model == "auto" else model)
 
-    coarse = cv2.resize(m, (w, h), interpolation=cv2.INTER_LINEAR)
-    if max(h, w) <= SEG_SIZE:
-        alpha = coarse
-    else:
-        # refina só a faixa incerta da borda usando a imagem original como guia
-        gray_hr = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-        gray_lr = cv2.cvtColor(small, cv2.COLOR_RGB2GRAY)
-        refined = _fast_guided_upsample(gray_hr, gray_lr, m, r=4, eps=1e-3)
-        k = max(3, int(round(max(h, w) / SEG_SIZE)) * 4 + 1)
-        band = (cv2.dilate(coarse, np.ones((k, k), np.uint8)) - cv2.erode(coarse, np.ones((k, k), np.uint8))) > 0.1
-        alpha = np.where(band, refined, coarse)
-    alpha = np.clip(alpha, 0, 1).astype(np.float32)
-    alpha[alpha < 0.01] = 0.0
-    alpha[alpha > 0.99] = 1.0
+
+def use_letterbox(cfg: MattingConfig, h: int, w: int) -> bool:
+    if cfg.letterbox == "auto":
+        return max(h, w) / min(h, w) >= cfg.aspect_limit
+    return cfg.letterbox == "always"
+
+
+def raw_mask(rgb: np.ndarray, model: str = "auto", letterbox: bool = False, pad: str = "mean") -> np.ndarray:
+    """Saída do modelo na janela útil (sem padding), ainda em resolução de modelo."""
+    name = "isnet" if (model == "auto" and _birefnet_failed) else ("birefnet" if model == "auto" else model)
+    small, (top, left, nh, nw) = _model_input(rgb, letterbox, pad, SEG_MODELS[name][1])
+    m = _run_model(small, model)
+    return m[top:top + nh, left:left + nw]
+
+
+def alpha_from_raw(rgb: np.ndarray, m: np.ndarray, cfg: MattingConfig = DEFAULT_MATTING) -> np.ndarray:
+    """Da saída do modelo à máscara final na resolução ORIGINAL da imagem."""
+    h, w = rgb.shape[:2]
+    m = _normalize(m, cfg.norm)
+    coarse = np.clip(cv2.resize(m, (w, h), interpolation=cv2.INTER_CUBIC), 0, 1).astype(np.float32)
+    if cfg.guide != "none":
+        # Só a faixa incerta da borda é refinada; o miolo e o fundo ficam como o modelo disse.
+        s = max(h, w) / SEG_SIZE
+        k = int(round(6 * s)) * 2 + 1
+        kernel = np.ones((k, k), np.uint8)
+        band = (cv2.dilate(coarse, kernel) - cv2.erode(coarse, kernel)) > 0.05
+        coarse = _refine_band(rgb, coarse, band, cfg, r=max(2, int(round(cfg.gf_radius * s))))
+    alpha = np.clip(coarse, 0, 1).astype(np.float32)
+    alpha[alpha < 0.02] = 0.0
+    alpha[alpha > 0.98] = 1.0
     return alpha
 
 
-def remove_background(img: np.ndarray, decontaminate: bool = True, model: str = "auto") -> np.ndarray:
+def predict_alpha(rgb: np.ndarray, model: str = "auto", cfg: MattingConfig = DEFAULT_MATTING) -> np.ndarray:
+    """Máscara alfa suave na resolução ORIGINAL da imagem."""
+    h, w = rgb.shape[:2]
+    return alpha_from_raw(rgb, raw_mask(rgb, model, use_letterbox(cfg, h, w), cfg.pad), cfg)
+
+
+def remove_background(img: np.ndarray, decontaminate: bool = True, model: str = "auto", cfg: MattingConfig = DEFAULT_MATTING) -> np.ndarray:
     """Remove o fundo mantendo a resolução e os pixels originais do objeto."""
     rgb = img[..., :3]
-    alpha = predict_alpha(rgb, model)
+    alpha = predict_alpha(rgb, model, cfg)
     if img.shape[2] == 4:  # já tinha transparência: não "ressuscita" o que era invisível
         alpha = np.minimum(alpha, img[..., 3])
-    fg = estimate_foreground(rgb, alpha) if decontaminate else rgb
+    fg = estimate_foreground(rgb, alpha, cfg.fg) if decontaminate else rgb
     return np.dstack([fg, alpha])
