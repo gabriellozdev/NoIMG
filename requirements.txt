@@ -1,0 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+onnxruntime
+opencv-python-headless
+pillow
+numpy
+flask

@@ -1,0 +1,21 @@
+# Ambiente Python
+.venv/
+__pycache__/
+*.pyc
+
+# Modelos de IA (centenas de MB; baixe com `python baixar_modelos.py`)
+models/
+
+# Build do frontend (gere com `npm run build` em frontend/)
+web/dist/
+
+# Imagens de teste locais
+samples/
+
+# Demos em tamanho cheio (só a pasta demo/web vai para o site)
+frontend/public/demo/*.png
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
