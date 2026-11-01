@@ -82,53 +82,6 @@ http://127.0.0.1:7860
 
 All image processing is performed locally.
 
-## Development
-
-### Frontend
-
-Fica em `frontend/` e usa React, Vite e Tailwind v4. O design foi feito com a skill oil-ui, com conceitos e revisões de agentes independentes; as notas estão em `.oil-ui/redesign/` (fora do git).
-
-- **Direção "Vitrine da Coleção":** personagens recortados ficam sobre blocos de cor chapada, e o título passa atrás deles.
-- **Fontes:** Familjen Grotesk nos títulos e Instrument Sans no texto.
-- **Cores:** branco, tinta #141418, cobalto #2E4BFF (só nas ações), rosa #FFB3C7 e amarelo #FFE27A (nos blocos).
-- **Animações:** usam GSAP e respeitam a opção "reduzir movimento" do sistema.
-- **Imagens:** ficam em `frontend/public/site/`. São fotos do Unsplash de fundo liso, recortadas, ampliadas e padronizadas pelo próprio NoIMG. Os créditos estão no rodapé.
-
-## Reverse Engineering & Technical Implementation
-
-NoIMG's processing pipeline was developed with reference to the behavior of established image processing services, particularly iLoveIMG and remove.bg.
-
-The following findings come from reverse engineering their publicly delivered frontend code and network interactions.
-
-### iLoveIMG — Image Upscaling
-
-The browser does not perform the actual upscaling. Instead:
-
-- Images are uploaded to a remote processing server using Plupload.
-- The frontend sends a `POST` request to `{workerServer}/{apiVersion}/upscale`.
-- The request includes `task`, `server_filename`, and `scale` (2 or 4).
-- The server returns the processed image as a Blob.
-
-The interface exposes two scaling options: 2× and 4×. The observed limits include a 6 MB upload size and `pxsize: 33177600` (approximately 33 MP output).
-
-The actual server-side AI model is not exposed in the frontend code. NoIMG uses the open-source Real-ESRGAN implementation instead.
-
-### remove.bg — Background Removal
-
-The observed response is a ZIP archive containing separate image layers:
-
-| File | Purpose |
-|---|---|
-| `color.jpg` | Foreground colors with background contamination removed from the edges. |
-| `alpha.png` | Full-resolution transparency mask. |
-| `shadow_color.jpg` | Optional shadow color layer. |
-| `shadow_alpha.png` | Optional shadow transparency mask. |
-| `semi_transparency...` | Additional transparency information when available. |
-
-The browser combines the foreground and alpha layers pixel by pixel to produce the final PNG.
-
-This separation is important: the foreground colors and transparency mask are processed independently, allowing accurate edge reconstruction without unnecessarily modifying the original image.
-
 ### NoIMG Implementation
 
 | Processing Stage | Reference Services | NoIMG |
