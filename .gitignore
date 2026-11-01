@@ -19,3 +19,5 @@ frontend/public/demo/*.png
 .DS_Store
 Thumbs.db
 desktop.ini
+
+.claude
