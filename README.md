@@ -68,11 +68,29 @@ The installer automatically:
 
 ## Usage
 
-Double-click `NoIMG.exe` (or `iniciar.bat`) to launch NoIMG.
+### Easiest: `NoIMG.exe` (no source code needed)
 
-`NoIMG.exe` handles setup on its own. On first run it finds Python (and offers to install it with winget if missing), creates the virtual environment, installs the dependencies, downloads the models and builds the web interface. Then it starts the server and opens the browser. Later runs skip whatever is already done. Keep its window open while you use the app; closing it stops the server. The exe must stay in the project folder.
+Download `NoIMG.exe` from the [Releases](https://github.com/gabriellozdev/NoIMG/releases) page and open it. That is all.
 
-To rebuild the exe, run `build_exe.bat`. It uses PyInstaller in a separate `.venv-build`, and the app itself does not depend on it.
+The exe carries the app and the prebuilt interface. On the first run it:
+
+1. installs NoIMG into `%LOCALAPPDATA%\NoIMG`;
+2. finds Python 3.10+ (or offers to install Python 3.12 with winget);
+3. creates the virtual environment and installs the dependencies (PyTorch CPU and others, a few hundred MB);
+4. downloads the AI models (about 320 MB);
+5. starts the server and opens the browser.
+
+Later runs open in seconds. Keep the console window open while you use the app; closing it stops the server. A newer exe replaces only the code and keeps the installed dependencies and models. To uninstall, delete `%LOCALAPPDATA%\NoIMG`.
+
+The first run needs an internet connection. Windows SmartScreen may warn about an unrecognized app because the exe is not code-signed: choose *More info → Run anyway*.
+
+### From the source
+
+Double-click `iniciar.bat`, or `NoIMG.exe` placed inside the project folder (it then uses that folder instead of installing).
+
+### Building the exe for a release
+
+Run `build_exe.bat` (needs Python 3.10+ and Node.js). It builds the interface, bundles the app with `launcher/make_payload.py`, and packs everything with PyInstaller in a separate `.venv-build`; the app itself does not depend on PyInstaller. Attach the resulting `NoIMG.exe` to a GitHub release.
 
 The application will be available at:
 

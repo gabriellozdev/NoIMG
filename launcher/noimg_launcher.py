@@ -1,6 +1,11 @@
 """NoIMG.exe — prepara tudo na primeira vez e abre o NoIMG no navegador.
 
-Fica na pasta do projeto (ao lado do app.py). Em cada abertura ele:
+Funciona de dois jeitos:
+  - avulso (baixado de um release): o exe leva o app e o site já gerado dentro dele e
+    instala tudo em %LOCALAPPDATA%\\NoIMG; uma versão nova troca só o código (o .venv e
+    os modelos ficam);
+  - dentro da pasta do projeto (ao lado do app.py): usa essa pasta, como o iniciar.bat.
+Em cada abertura ele:
   1. acha um Python 3.10+ (se não houver, oferece instalar o 3.12 pelo winget);
   2. cria o .venv e instala o requirements.txt (de novo só se o arquivo mudar);
   3. baixa os modelos de IA (só na primeira vez);
@@ -38,12 +43,34 @@ class Falha(Exception):
     pass
 
 
+INSTALL_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "NoIMG"
+
+
 def root_dir() -> Path:
     base = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
     for d in (base, base.parent):
         if (d / "app.py").exists() and (d / "requirements.txt").exists():
             return d
+    payload = Path(getattr(sys, "_MEIPASS", "")) / "payload"
+    if getattr(sys, "frozen", False) and (payload / "app.py").exists():
+        return install_payload(payload, INSTALL_DIR)
     raise Falha(f"Não achei o app.py. Deixe o NoIMG.exe dentro da pasta do NoIMG (estou em {base}).")
+
+
+def install_payload(payload: Path, dest: Path) -> Path:
+    """Copia o app embutido no exe para `dest` quando a versão muda. O .venv e os modelos
+    ficam; só as pastas de código do NoIMG são trocadas, para não sobrar arquivo velho."""
+    version = (payload / "VERSION").read_text().strip()
+    stamp = dest / "VERSION"
+    if stamp.exists() and stamp.read_text().strip() == version and (dest / "app.py").exists():
+        return dest
+    print(f"\n> Instalando o NoIMG em {dest}...")
+    dest.mkdir(parents=True, exist_ok=True)
+    for name in ("noimg", "web"):
+        shutil.rmtree(dest / name, ignore_errors=True)
+    shutil.copytree(payload, dest, dirs_exist_ok=True, ignore=shutil.ignore_patterns("VERSION"))
+    stamp.write_text(version)  # por último: cópia interrompida reinstala na próxima vez
+    return dest
 
 
 def clean_env() -> dict:
